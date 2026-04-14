@@ -47,12 +47,13 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 const STEP_TITLES = [
-  'Rule Type',
-  'Triggers',
-  'Actions',
-  'Destination',
-  'Preview',
-  'Success'
+  'Rule Identity',
+  'Trigger Logic',
+  'Execution Action',
+  'Fund Destination',
+  'Value Mapping',
+  'Review & Intelligence',
+  'Ready to Deploy'
 ];
 
 export default function UserRules() {
@@ -69,21 +70,23 @@ export default function UserRules() {
 
   const [isBuilderOpen, setIsBuilderOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
-  const [direction, setDirection] = useState(0); // 1 for next, -1 for back
+  const [direction, setDirection] = useState(0);
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
+  const [isAdvancedMode, setIsAdvancedMode] = useState(false);
+  const [isValueModeCustom, setIsValueModeCustom] = useState(false);
   
   // Builder State
   const [ruleName, setRuleName] = useState('');
   const [ruleType, setRuleType] = useState<string>('custom');
-  const [conditionType, setConditionType] = useState<any>('all');
-  const [conditionValue, setConditionValue] = useState<string | number>('');
-  const [conditionOperator, setConditionOperator] = useState<any>('>');
+  const [conditions, setConditions] = useState<{type: string, operator: string, value: string | number}[]>([
+    { type: 'all', operator: '>', value: '' }
+  ]);
   const [actionType, setActionType] = useState<any>('round-up');
   const [actionValue, setActionValue] = useState<number>(0);
   const [destinationType, setDestinationType] = useState<any>('Wallet');
   const [destinationName, setDestinationName] = useState('Spare Wallet');
 
-  // Intelligence: Suggestions
+  // Intelligence
   const suggestions = useMemo(() => {
     const foodSpend = transactions.filter(t => t.category === 'Food').reduce((s, t) => s + t.amount, 0);
     const suggestionsList = [];
@@ -92,33 +95,16 @@ export default function UserRules() {
       suggestionsList.push({
         id: 's1',
         title: 'Food Control Rule',
-        desc: `You spent ₹${foodSpend} on food this week. Add a guilt tax?`,
+        desc: `Save ₹5 every time you spend on Food.`,
         icon: <Zap className="w-4 h-4" />,
         color: 'text-warning',
         action: () => {
           handleOpenBuilder();
           setRuleType('guilt-tax');
-          setConditionType('category');
-          setConditionValue('Food');
+          setConditions([{ type: 'category', operator: '==', value: 'Food' }]);
           setRuleName('Food Control Rule');
-        }
-      });
-    }
-
-    const weekendSpend = transactions.filter(t => [0, 6].includes(new Date(t.timestamp).getDay())).length;
-    if (weekendSpend > 5) {
-      suggestionsList.push({
-        id: 's2',
-        title: 'Weekend Warrior',
-        desc: 'Frequent weekend spending detected. Auto-sweep spare change?',
-        icon: <Target className="w-4 h-4" />,
-        color: 'text-risk',
-        action: () => {
-          handleOpenBuilder();
-          setRuleType('overspend');
-          setConditionType('day');
-          setConditionValue('weekend');
-          setRuleName('Weekend Warrior Rule');
+          setActionType('fixed');
+          setActionValue(5);
         }
       });
     }
@@ -130,33 +116,34 @@ export default function UserRules() {
     if (rule) {
       setEditingRuleId(rule.id);
       setRuleName(rule.name);
-      setConditionType(rule.condition.type);
-      setConditionValue(rule.condition.value || '');
-      setConditionOperator(rule.condition.operator || '>');
+      setConditions([{
+        type: rule.condition.type,
+        operator: rule.condition.operator || '>',
+        value: rule.condition.value || ''
+      }]);
       setActionType(rule.action.type);
       setActionValue(rule.action.value || 0);
+      setIsValueModeCustom(rule.action.value ? ![10, 50, 100].includes(rule.action.value) : false);
       setDestinationType(rule.action.destination?.type || 'Wallet');
       setDestinationName(rule.action.destination?.name || 'Spare Wallet');
       setRuleType(rule.category === 'round-up' ? 'round-up' : 'custom');
-      setCurrentStep(1);
     } else {
       setEditingRuleId(null);
       setRuleName('');
-      setConditionType('all');
-      setConditionValue('');
-      setConditionOperator('>');
+      setConditions([{ type: 'all', operator: '>', value: '' }]);
       setActionType('round-up');
       setActionValue(0);
+      setIsValueModeCustom(false);
       setDestinationType('Wallet');
       setDestinationName('Spare Wallet');
       setRuleType('custom');
-      setCurrentStep(1);
     }
+    setCurrentStep(1);
     setIsBuilderOpen(true);
   };
 
   const handleNext = () => {
-    if (currentStep < 6) {
+    if (currentStep < 7) {
       setDirection(1);
       setCurrentStep(prev => prev + 1);
     }
@@ -170,12 +157,13 @@ export default function UserRules() {
   };
 
   const handleSaveRule = () => {
+    const mainCondition = conditions[0];
     const newRuleData: Omit<Rule, 'id' | 'triggerCount'> = {
       name: ruleName || 'Untitled Rule',
       condition: {
-        type: conditionType,
-        operator: conditionOperator,
-        value: conditionValue,
+        type: mainCondition.type as any,
+        operator: mainCondition.operator as any,
+        value: mainCondition.value,
       },
       action: {
         type: actionType,
@@ -194,14 +182,15 @@ export default function UserRules() {
     } else {
       addRule(newRuleData as any);
     }
-    handleNext(); // Move to success step
+    handleNext();
   };
 
   const getRulePreview = () => {
+    const mainCond = conditions[0];
     let ifPart = "Every transaction";
-    if (conditionType === 'category') ifPart = `Spend on ${conditionValue || 'Category'}`;
-    if (conditionType === 'amount') ifPart = `Transaction > ₹${conditionValue || '0'}`;
-    if (conditionType === 'day') ifPart = `Spend on ${conditionValue || 'Day'}`;
+    if (mainCond.type === 'category') ifPart = `Spend on ${mainCond.value || 'Category'}`;
+    if (mainCond.type === 'amount') ifPart = `Transaction ${mainCond.operator} ₹${mainCond.value || '0'}`;
+    if (mainCond.type === 'day') ifPart = `Spend on ${mainCond.value || 'Day'}`;
 
     let thenPart = "round-up spare change";
     if (actionType === 'fixed') thenPart = `invest ₹${actionValue || '0'}`;
@@ -220,7 +209,6 @@ export default function UserRules() {
 
   const [scrolled, setScrolled] = useState(false);
 
-  // Variants for slide animation
   const slideVariants = {
     enter: (direction: number) => ({
       x: direction > 0 ? 500 : -500,
@@ -254,7 +242,6 @@ export default function UserRules() {
 
       {/* INTELLIGENCE BAR */}
       <div className="grid md:grid-cols-3 gap-6">
-        {/* IMPACT CARD */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-5 border-l-4 border-l-success relative overflow-hidden group">
           <div className="absolute right-[-10%] top-[-10%] opacity-5 group-hover:scale-110 transition-transform">
              <TrendingUp className="w-24 h-24 text-success" />
@@ -264,7 +251,6 @@ export default function UserRules() {
           <p className="text-xs text-muted-foreground mt-1">Saved automatically this month</p>
         </motion.div>
 
-        {/* SUGGESTIONS */}
         {suggestions.map((s, i) => (
           <motion.div 
             key={i}
@@ -310,14 +296,10 @@ export default function UserRules() {
                 className={`glass-card p-1 pr-6 flex items-center gap-6 group transition-all duration-300 ${!rule.enabled ? 'opacity-60 grayscale-[0.5]' : 'hover:shadow-2xl hover:shadow-primary/10 hover:border-primary/20'}`}
               >
                 <div className={`w-1.5 self-stretch rounded-l-full transition-colors ${rule.enabled ? 'bg-primary' : 'bg-muted-foreground/20'}`} />
-                
                 <div className="flex-1 py-4 flex items-center gap-6">
-                  {/* ICON BLOCK */}
                   <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all group-hover:scale-110 shadow-sm ${CATEGORY_COLORS[rule.category || 'custom']}`}>
                     {rule.category === 'round-up' ? <Zap className="w-6 h-6" /> : rule.category === 'overspend' ? <AlertTriangle className="w-6 h-6" /> : <ShieldCheck className="w-6 h-6" />}
                   </div>
-
-                  {/* INFO BLOCK */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-1.5">
                       <h3 className="text-base font-bold text-foreground truncate">{rule.name}</h3>
@@ -334,8 +316,6 @@ export default function UserRules() {
                       <span className="text-[10px] opacity-60 ml-1">in {rule.action.destination?.name}</span>
                     </p>
                   </div>
-
-                  {/* STATS BLOCK */}
                   <div className="hidden md:flex items-center gap-10 pr-6 border-r border-border/50">
                     <div className="flex flex-col items-center">
                       <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Triggered</p>
@@ -348,20 +328,10 @@ export default function UserRules() {
                         {rule.triggerCount}x
                       </motion.p>
                     </div>
-                    <div className="flex flex-col items-center">
-                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Last Run</p>
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
-                        <Clock className="w-3 h-3 opacity-40" />
-                        {rule.lastTriggered ? new Date(rule.lastTriggered).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Never'}
-                      </div>
-                    </div>
                   </div>
                 </div>
-
-                {/* CONTROLS */}
                 <div className="flex items-center gap-3">
                   <Switch checked={rule.enabled} onCheckedChange={() => toggleRule(rule.id)} className="data-[state=checked]:bg-primary" />
-                  
                   <Select onValueChange={(val) => {
                     if (val === 'edit') handleOpenBuilder(rule);
                     if (val === 'duplicate') duplicateRule(rule.id);
@@ -387,7 +357,6 @@ export default function UserRules() {
       <AnimatePresence>
         {isBuilderOpen && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center p-0 sm:p-4 md:p-8">
-            {/* BACKDROP */}
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -395,8 +364,6 @@ export default function UserRules() {
               onClick={() => setIsBuilderOpen(false)}
               className="absolute inset-0 bg-black/40 backdrop-blur-xl"
             />
-
-            {/* MODAL CARD */}
             <motion.div 
               initial={{ y: "100%", opacity: 0, scale: 0.95 }}
               animate={{ y: 0, opacity: 1, scale: 1 }}
@@ -408,9 +375,7 @@ export default function UserRules() {
               }}
               className="relative w-full max-w-2xl bg-card border border-border/50 shadow-2xl rounded-none sm:rounded-[2rem] overflow-hidden flex flex-col h-full max-h-screen sm:max-h-[85vh] z-[10000]"
             >
-              {/* STICKY HEADER AREA */}
               <div className={`sticky top-0 z-30 bg-card transition-shadow duration-300 ${scrolled ? 'shadow-lg border-b border-border/10' : ''}`}>
-                {/* PROGRESS BAR */}
                 <div className="h-1.5 w-full bg-muted overflow-hidden flex">
                   {STEP_TITLES.map((_, i) => (
                     <motion.div 
@@ -423,27 +388,18 @@ export default function UserRules() {
                     />
                   ))}
                 </div>
-
-                {/* HEADER CONTENT */}
                 <div className="px-6 md:px-10 pt-6 pb-4 flex items-center justify-between">
                   <div>
-                    <p className="text-[9px] font-black underline underline-offset-4 decoration-primary text-primary tracking-[0.2em] mb-1">Step {currentStep} of 6</p>
+                    <p className="text-[9px] font-black underline underline-offset-4 decoration-primary text-primary tracking-[0.2em] mb-1">Phase {currentStep} of 7</p>
                     <h2 className="text-xl font-bold font-heading tracking-tight">{STEP_TITLES[currentStep - 1]}</h2>
                   </div>
-                  <button 
-                    onClick={() => setIsBuilderOpen(false)}
-                    className="w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-risk/10 hover:text-risk transition-all group active:scale-95"
-                  >
+                  <button onClick={() => setIsBuilderOpen(false)} className="w-10 h-10 rounded-full bg-muted flex items-center justify-center hover:bg-risk/10 hover:text-risk transition-all group active:scale-95">
                     <X className="w-5 h-5 group-hover:rotate-90 transition-transform" />
                   </button>
                 </div>
               </div>
 
-              {/* SCROLLABLE STEP CONTENT */}
-              <div 
-                className="flex-1 overflow-y-auto scroll-smooth scrollbar-hide pb-24"
-                onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 10)}
-              >
+              <div className="flex-1 overflow-y-auto scroll-smooth pb-24" onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 10)}>
                 <div className="relative min-h-[400px]">
                   <AnimatePresence initial={false} custom={direction} mode="wait">
                     <motion.div
@@ -456,188 +412,156 @@ export default function UserRules() {
                       transition={{ type: "spring", stiffness: 300, damping: 32 }}
                       className="px-6 md:px-10 py-6 flex flex-col gap-8"
                     >
-                      {/* STEP 1: RULE TYPE */}
+                      {/* STEP 1: RULE IDENTITY */}
                       {currentStep === 1 && (
                         <div className="space-y-6">
-                          <div className="flex flex-col gap-1">
-                            <h3 className="text-lg font-bold">What do you want to automate?</h3>
-                            <p className="text-sm text-muted-foreground leading-relaxed">Choose a strategic path for your intelligent capital movement.</p>
+                           <div className="flex flex-col gap-1">
+                            <h3 className="text-lg font-bold">Give your rule a identity</h3>
+                            <p className="text-sm text-muted-foreground font-medium italic">"Weekend Saver", "Coffee Tax", "Guilt Tax"...</p>
                           </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            {[
-                              { id: 'round-up', title: 'Smart Round-Up', icon: <Zap />, desc: 'Invest spare change from every spend automatically' },
-                              { id: 'guilt-tax', title: 'Spending Control', icon: <PieChart />, desc: 'Auto-invest a penalty when you overspend categories' },
-                              { id: 'overspend', title: 'Investment Rule', icon: <TrendingUp />, desc: 'Strategic capital moves on specific triggers' },
-                              { id: 'custom', title: 'Custom Builder', icon: <Settings2 />, desc: 'Build logic from scratch for advanced scenarios' }
-                            ].map(t => (
-                              <button
-                                key={t.id}
-                                onClick={() => {
-                                  setRuleType(t.id);
-                                  if (t.id === 'round-up') setConditionType('all');
-                                  handleNext();
-                                }}
-                                className={`p-6 rounded-2xl border-2 text-left transition-all group flex flex-col gap-4 active:scale-[0.98] ${ruleType === t.id ? 'border-primary bg-primary/5 ring-4 ring-primary/5' : 'border-border/50 hover:border-primary/20 hover:bg-muted/30'}`}
-                              >
-                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${ruleType === t.id ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/30' : 'bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary'}`}>
-                                  {t.icon}
-                                </div>
-                                <div className="space-y-1">
-                                  <h4 className="font-bold text-sm tracking-tight">{t.title}</h4>
-                                  <p className="text-[10px] text-muted-foreground leading-snug">{t.desc}</p>
-                                </div>
-                              </button>
-                            ))}
+                          <div className="relative">
+                            <Input 
+                              value={ruleName}
+                              onChange={(e) => setRuleName(e.target.value)}
+                              placeholder="e.g., Weekend Spender Logic"
+                              autoFocus
+                              className="h-20 text-2xl font-black bg-muted/30 border-none rounded-3xl px-8 focus:ring-4 focus:ring-primary/20 transition-all placeholder:opacity-30"
+                            />
+                            {ruleName && (
+                              <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="absolute right-6 top-1/2 -translate-y-1/2">
+                                <CheckCircle2 className="w-8 h-8 text-primary" />
+                              </motion.div>
+                            )}
+                          </div>
+                          <div className="flex gap-2 flex-wrap">
+                             {['Weekend Saver', 'Coffee Tax', 'Guilt Tax', 'Night Out'].map(n => (
+                               <button key={n} onClick={() => setRuleName(n)} className="px-4 py-2 rounded-full border border-border bg-card text-xs font-bold hover:bg-muted transition-colors">
+                                 {n}
+                               </button>
+                             ))}
                           </div>
                         </div>
                       )}
 
-                      {/* STEP 2: CONDITION */}
+                      {/* STEP 2: TRIGGER LOGIC */}
                       {currentStep === 2 && (
                         <div className="space-y-8">
-                          <div className="flex flex-col gap-1">
-                            <h3 className="text-lg font-bold text-foreground">When should this rule trigger?</h3>
-                            <p className="text-sm text-muted-foreground leading-relaxed">Define the precise moment your rule spring into action.</p>
+                          <div className="flex items-center justify-between">
+                            <div className="flex flex-col gap-1">
+                              <h3 className="text-lg font-bold text-foreground">Trigger Pattern</h3>
+                              <p className="text-sm text-muted-foreground">Select when SparseMoney should scan.</p>
+                            </div>
+                            <div className="flex items-center gap-2 bg-muted p-1 rounded-xl">
+                              <button onClick={() => setIsAdvancedMode(false)} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${!isAdvancedMode ? 'bg-card shadow-sm text-primary' : 'text-muted-foreground'}`}>Quick</button>
+                              <button onClick={() => setIsAdvancedMode(true)} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${isAdvancedMode ? 'bg-card shadow-sm text-primary' : 'text-muted-foreground'}`}>Advanced</button>
+                            </div>
                           </div>
                           
                           <div className="space-y-6">
-                            <div className="flex flex-wrap gap-2.5">
-                              {[
-                                { id: 'all', label: 'Every transaction' },
-                                { id: 'category', label: 'By Category' },
-                                { id: 'amount', label: 'Threshold' },
-                                { id: 'day', label: 'Weekends/Weekdays' },
-                                { id: 'merchant', label: 'Merchant' }
-                              ].map(opt => (
-                                <button
-                                  key={opt.id}
-                                  onClick={() => setConditionType(opt.id)}
-                                  className={`px-5 py-3 rounded-xl border-2 text-[11px] font-black uppercase tracking-wider transition-all active:scale-95 ${conditionType === opt.id ? 'border-primary bg-primary text-primary-foreground shadow-lg shadow-primary/30' : 'border-border/50 hover:border-primary/30 hover:bg-muted'}`}
-                                >
-                                  {opt.label}
-                                </button>
-                              ))}
-                            </div>
+                            {!isAdvancedMode ? (
+                              <div className="grid grid-cols-2 gap-3">
+                                {[
+                                  { id: 'all', label: 'Every Transact', icon: <Repeat /> },
+                                  { id: 'category', label: 'By Category', icon: <PieChart /> },
+                                  { id: 'amount', label: 'Above Amount', icon: <TrendingUp /> },
+                                  { id: 'day', label: 'On Weekends', icon: <Zap /> }
+                                ].map(opt => (
+                                  <button
+                                    key={opt.id}
+                                    onClick={() => setConditions([{...conditions[0], type: opt.id}])}
+                                    className={`flex flex-col items-center justify-center p-6 rounded-3xl border-2 transition-all group hover:scale-[1.02] active:scale-[0.98] ${conditions[0].type === opt.id ? 'border-primary bg-primary/5 shadow-md' : 'border-border/50 hover:bg-muted'}`}
+                                  >
+                                    <div className={`w-12 h-12 mb-3 transition-colors ${conditions[0].type === opt.id ? 'text-primary' : 'text-muted-foreground opacity-60'}`}>{opt.icon}</div>
+                                    <span className={`text-xs font-black uppercase tracking-tight ${conditions[0].type === opt.id ? 'text-primary' : 'text-muted-foreground'}`}>{opt.label}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="space-y-4">
+                                <div className="flex flex-wrap gap-2">
+                                  {conditions.map((c, i) => (
+                                    <motion.div key={i} initial={{ scale: 0, x: -10 }} animate={{ scale: 1, x: 0 }} exit={{ scale: 0, x: 10 }} className="flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-full text-xs font-bold border border-primary/20">
+                                      {c.type} {c.operator} {c.value || '...'}
+                                      <X className="w-3 h-3 cursor-pointer hover:rotate-90 transition-transform" onClick={() => setConditions(conditions.filter((_, idx) => idx !== i))} />
+                                    </motion.div>
+                                  ))}
+                                  <button className="px-4 py-2 rounded-full border border-dashed border-primary/40 text-primary text-xs font-bold hover:bg-primary/5 transition-colors" onClick={() => setConditions([...conditions, {type: 'category', operator: '==', value: ''}])}>+ Add Logic</button>
+                                </div>
+                              </div>
+                            )}
 
                             <AnimatePresence mode="wait">
-                              {conditionType !== 'all' && (
-                                <motion.div 
-                                  initial={{ opacity: 0, y: 20 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  exit={{ opacity: 0, y: 10 }}
-                                  className="p-8 bg-muted/20 rounded-[2rem] border border-border/30 space-y-5"
-                                >
-                                  {conditionType === 'amount' && (
-                                    <div className="flex items-center gap-4">
-                                      <Select value={conditionOperator} onValueChange={setConditionOperator}>
-                                        <SelectTrigger className="w-32 h-14 rounded-2xl font-black bg-card border-2">
-                                          <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent className="glass-card">
-                                          <SelectItem value=">">Above ₹</SelectItem>
-                                          <SelectItem value="<">Below ₹</SelectItem>
-                                          <SelectItem value="==">Exact ₹</SelectItem>
-                                        </SelectContent>
-                                      </Select>
-                                      <Input 
-                                        type="number"
-                                        placeholder="0.00" 
-                                        value={conditionValue}
-                                        onChange={(e) => setConditionValue(e.target.value)}
-                                        className="rounded-2xl h-14 font-black text-xl border-2 focus:ring-primary bg-card"
-                                      />
-                                    </div>
-                                  )}
-                                  {(conditionType === 'category' || conditionType === 'day' || conditionType === 'merchant') && (
-                                    <Input 
-                                      placeholder={conditionType === 'category' ? 'Food, Entertainment, Transport...' : conditionType === 'day' ? 'weekend or weekday' : 'Amazon, Starbucks, Zomato...'} 
-                                      value={conditionValue}
-                                      onChange={(e) => setConditionValue(e.target.value)}
-                                      className="rounded-2xl h-16 font-black text-lg border-2 focus:ring-primary bg-card px-6"
-                                    />
-                                  )}
+                              {conditions[0].type !== 'all' && (
+                                <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="p-8 bg-muted/20 border-2 border-primary/10 rounded-[2rem] gap-4 flex flex-col shadow-inner">
+                                   {conditions[0].type === 'amount' && (
+                                     <div className="flex items-center gap-3">
+                                       <Select value={conditions[0].operator} onValueChange={(v) => setConditions([{...conditions[0], operator: v}])}>
+                                         <SelectTrigger className="w-24 border-none bg-card h-12 rounded-xl font-bold shadow-sm"><SelectValue /></SelectTrigger>
+                                         <SelectContent className="glass-card"><SelectItem value=">">Above</SelectItem><SelectItem value="<">Below</SelectItem></SelectContent>
+                                       </Select>
+                                       <Input type="number" placeholder="₹ Value..." value={conditions[0].value} onChange={(e) => setConditions([{...conditions[0], value: e.target.value}])} className="h-12 rounded-xl border-none bg-card font-black text-xl px-6 shadow-sm" />
+                                     </div>
+                                   )}
+                                   {conditions[0].type === 'category' && (
+                                     <Select value={conditions[0].value as string} onValueChange={(v) => setConditions([{...conditions[0], value: v}])}>
+                                       <SelectTrigger className="h-14 border-none bg-card rounded-2xl font-black text-lg px-6 shadow-sm"><SelectValue placeholder="Select Category" /></SelectTrigger>
+                                       <SelectContent className="glass-card">
+                                         {['Shopping', 'Food', 'Transport', 'Entertainment', 'Health'].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                                       </SelectContent>
+                                     </Select>
+                                   )}
                                 </motion.div>
                               )}
                             </AnimatePresence>
                           </div>
-
-                          {/* DIFFICULTY INDICATOR */}
-                          <div className="flex items-center justify-between p-5 bg-muted/40 rounded-2xl border border-border/20">
-                             <div className="flex items-center gap-3">
-                               <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                                 <ShieldCheck className="w-4 h-4 text-primary" />
-                               </div>
-                               <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest leading-none">Intelligence Check</span>
-                             </div>
-                             <div className="flex items-center gap-2">
-                               <span className="text-[10px] font-bold text-muted-foreground uppercase opacity-60">Logic Level:</span>
-                               <span className={`text-[10px] font-black px-3 py-1 rounded-full ${conditionType === 'all' ? 'bg-success/10 text-success border border-success/30' : 'bg-warning/10 text-warning border border-warning/30'}`}>
-                                 {conditionType === 'all' ? 'FOUNDATIONAL' : 'CALCULATED'}
-                               </span>
-                             </div>
-                          </div>
                         </div>
                       )}
 
-                      {/* STEP 3: ACTION */}
+                      {/* STEP 3: EXECUTION ACTION */}
                       {currentStep === 3 && (
                         <div className="space-y-6">
-                          <div className="flex flex-col gap-1">
-                            <h3 className="text-lg font-bold">What should happen?</h3>
-                            <p className="text-sm text-muted-foreground leading-relaxed">Specify the financial counter-move for this automation.</p>
+                           <div className="flex flex-col gap-1">
+                            <h3 className="text-lg font-bold">Execution Pattern</h3>
+                            <p className="text-sm text-muted-foreground">Specify the financial counter-move.</p>
                           </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="grid grid-cols-2 gap-4">
                             {[
-                              { id: 'round-up', label: 'Intelligent Round-up', icon: <Zap className="w-5 h-5" />, desc: 'Capture change to nearest ₹10/₹50' },
-                              { id: 'fixed', label: 'Fixed Capital move', icon: <Target className="w-5 h-5" />, desc: 'Move a specific flat ₹ amount' },
-                              { id: 'percent', label: 'Proportional move', icon: <Repeat className="w-5 h-5" />, desc: 'Move % of the transaction value' },
-                              { id: 'auto-sweep', label: 'Auto-Sweep Sweep', icon: <ArrowRight className="w-5 h-5" />, desc: 'Clear idle balance from wallet' }
+                              { id: 'round-up', label: 'Round-up', icon: <Zap />, desc: 'Capture spare change from every spend' },
+                              { id: 'fixed', label: 'Invest Fixed', icon: <Target />, desc: 'Move a specific flat ₹ amount' },
+                              { id: 'percent', label: 'Percent %', icon: <Repeat />, desc: 'Move % of transaction value' },
+                              { id: 'auto-sweep', label: 'Auto-Sweep', icon: <ArrowRight />, desc: 'Zero balance wallet sweeps' }
                             ].map(act => (
                               <button
                                 key={act.id}
                                 onClick={() => setActionType(act.id)}
-                                className={`p-5 rounded-2xl border-2 text-left transition-all flex flex-col gap-4 group active:scale-[0.98] ${actionType === act.id ? 'border-primary bg-primary/5 ring-4 ring-primary/5' : 'border-border/50 hover:bg-muted/40'}`}
+                                className={`p-6 rounded-3xl border-2 text-left transition-all flex flex-col gap-4 group hover:scale-[1.02] active:scale-[0.98] ${actionType === act.id ? 'border-primary bg-primary/5 ring-4 ring-primary/5 shadow-lg' : 'border-border/50 hover:border-primary/20'}`}
                               >
-                                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${actionType === act.id ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/30' : 'bg-muted text-muted-foreground'}`}>
+                                 <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${actionType === act.id ? 'bg-primary text-primary-foreground shadow-lg' : 'bg-muted text-muted-foreground'}`}>
                                    {act.icon}
                                  </div>
                                  <div className="space-y-1">
-                                   <h4 className="font-bold text-xs tracking-tight">{act.label}</h4>
-                                   <p className="text-[9px] text-muted-foreground leading-snug">{act.desc}</p>
+                                   <h4 className="font-bold text-sm">{act.label}</h4>
+                                   <p className="text-[10px] text-muted-foreground leading-tight">{act.desc}</p>
                                  </div>
                               </button>
                             ))}
                           </div>
-                          {actionType !== 'round-up' && (
-                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-4 p-4 bg-muted/20 rounded-2xl border border-border/20">
-                               <div className="w-14 h-14 flex items-center justify-center bg-card rounded-xl font-black text-2xl text-primary border-2">
-                                  {actionType === 'percent' ? '%' : '₹'}
-                               </div>
-                               <Input 
-                                 type="number" 
-                                 placeholder="0" 
-                                 value={actionValue} 
-                                 onChange={(e) => setActionValue(Number(e.target.value))}
-                                 className="rounded-xl h-14 font-black text-2xl border-2 focus:ring-primary bg-card px-6"
-                               />
-                            </motion.div>
-                          )}
                         </div>
                       )}
 
-                      {/* STEP 4: DESTINATION */}
+                      {/* STEP 4: FUND DESTINATION */}
                       {currentStep === 4 && (
                         <div className="space-y-8">
                           <div className="flex flex-col gap-1">
-                            <h3 className="text-lg font-bold">Where should the money go?</h3>
-                            <p className="text-sm text-muted-foreground leading-relaxed">Direct the captured capital to a specific destination.</p>
+                            <h3 className="text-lg font-bold tracking-tight">Deployment Sector</h3>
+                            <p className="text-sm text-muted-foreground">Direct your capital into chosen asset clusters.</p>
                           </div>
-                          <div className="grid gap-3 mb-4">
+                          <div className="grid gap-3">
                             {[
-                              { id: 'Gold ETF', name: 'Nippon Gold ETF', icon: '🏆', meta: 'Commodity Asset' },
+                              { id: 'Gold ETF', name: 'Gold ETF', icon: '🏆', meta: 'Asset Backed' },
                               { id: 'Index Fund', name: 'Nifty 50 Index', icon: '📈', meta: 'Equity Growth' },
                               { id: 'Wallet', name: 'Spare Wallet', icon: '💳', meta: 'Liquid Cash' },
-                              { id: 'Goal', name: 'Personal Savings Goal', icon: '🎯', meta: 'Target Saving' },
+                              { id: 'Goal', name: 'Goal Fund', icon: '🎯', meta: 'Milestone' }
                             ].map(dest => (
                                <button
                                   key={dest.id}
@@ -645,151 +569,123 @@ export default function UserRules() {
                                     setDestinationType(dest.id);
                                     setDestinationName(dest.name);
                                   }}
-                                  className={`p-5 rounded-2xl border-2 flex items-center gap-5 transition-all group active:scale-[0.98] ${destinationType === dest.id ? 'border-primary bg-primary/5 shadow-inner' : 'border-border/50 hover:bg-muted/40 hover:border-primary/20'}`}
+                                  className={`p-6 rounded-3xl border-2 flex items-center gap-6 transition-all group hover:scale-[1.01] active:scale-[0.99] ${destinationType === dest.id ? 'border-primary bg-primary/5 shadow-inner' : 'border-border/50 hover:bg-muted'}`}
                                >
-                                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl transition-all ${destinationType === dest.id ? 'bg-primary text-primary-foreground shadow-lg' : 'bg-card shadow-sm group-hover:bg-primary/5'}`}>
+                                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-3xl transition-all shadow-sm ${destinationType === dest.id ? 'bg-primary text-primary-foreground' : 'bg-card'}`}>
                                     {dest.icon}
                                   </div>
-                                  <div className="text-left">
-                                    <p className="font-bold text-sm tracking-tight">{dest.name}</p>
+                                  <div className="flex-1 text-left">
+                                    <p className="font-black text-sm">{dest.name}</p>
                                     <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest opacity-60">{dest.meta}</p>
                                   </div>
-                                  {destinationType === dest.id && (
-                                    <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="ml-auto w-6 h-6 rounded-full bg-primary flex items-center justify-center">
-                                      <CheckCircle2 className="w-4 h-4 text-primary-foreground" />
-                                    </motion.div>
-                                  )}
+                                  {destinationType === dest.id && <CheckCircle2 className="w-6 h-6 text-primary" />}
                                </button>
                             ))}
                           </div>
                         </div>
                       )}
 
-                      {/* STEP 5: PREVIEW */}
+                      {/* STEP 5: VALUE MAPPING */}
                       {currentStep === 5 && (
                         <div className="space-y-8">
+                          <div className="flex items-center justify-between">
+                            <div className="flex flex-col gap-1">
+                              <h3 className="text-lg font-bold">Capital Allocation</h3>
+                              <p className="text-sm text-muted-foreground leading-relaxed">Choose precise mapping for your automation.</p>
+                            </div>
+                            <div className="flex items-center gap-2 bg-muted p-1 rounded-xl shadow-inner">
+                              <button onClick={() => setIsValueModeCustom(false)} className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${!isValueModeCustom ? 'bg-card shadow-sm text-primary' : 'text-muted-foreground'}`}>Presets</button>
+                              <button onClick={() => setIsValueModeCustom(true)} className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${isValueModeCustom ? 'bg-card shadow-sm text-primary' : 'text-muted-foreground'}`}>Custom</button>
+                            </div>
+                          </div>
+
+                          <AnimatePresence mode="wait">
+                            {!isValueModeCustom ? (
+                              <motion.div key="preset" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="grid grid-cols-3 gap-4">
+                                {[10, 50, 100].map(v => (
+                                  <button key={v} onClick={() => setActionValue(v)} className={`p-8 rounded-[2rem] border-2 flex flex-col items-center justify-center gap-2 transition-all hover:scale-[1.05] active:scale-[0.95] ${actionValue === v ? 'border-primary bg-primary text-primary-foreground shadow-2xl shadow-primary/30' : 'border-border/50 hover:bg-muted font-bold'}`}>
+                                    <span className="text-2xl font-black">₹{v}</span>
+                                    {actionValue === v && <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}><CheckCircle2 className="w-5 h-5" /></motion.div>}
+                                  </button>
+                                ))}
+                              </motion.div>
+                            ) : (
+                              <motion.div key="custom" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="p-8 bg-muted/20 border-2 border-primary/10 rounded-[2.5rem] flex items-center gap-6 shadow-inner">
+                                <motion.div initial={{ rotate: -10 }} animate={{ rotate: 0 }} className="w-20 h-20 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center font-black text-3xl shadow-lg shadow-primary/20">₹</motion.div>
+                                <Input autoFocus type="number" value={actionValue} onChange={(e) => setActionValue(Number(e.target.value))} placeholder="Amount..." className="h-20 text-4xl font-black bg-transparent border-none focus:ring-0 placeholder:opacity-20 flex-1" />
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      )}
+
+                      {/* STEP 6: REVIEW & INTELLIGENCE */}
+                      {currentStep === 6 && (
+                        <div className="space-y-8">
                           <div className="flex flex-col gap-1">
-                            <h3 className="text-lg font-bold">Final system Review</h3>
-                            <p className="text-sm text-muted-foreground leading-relaxed">Activate your strategic logic engine by confirming the summary below.</p>
+                            <h3 className="text-lg font-bold">Review System Logic</h3>
+                            <p className="text-sm text-muted-foreground">Natural language summary of your automation engine.</p>
                           </div>
                           
-                          <div className="glass-card p-10 border-4 border-primary/20 bg-gradient-to-br from-primary/10 to-transparent relative overflow-hidden ring-1 ring-primary/20 group">
-                             <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 group-hover:rotate-12 transition-all duration-700 pointer-events-none">
-                               <Sparkles className="w-32 h-32 text-primary" />
-                             </div>
-                             <p className="text-[10px] font-black uppercase text-primary tracking-[0.4em] mb-6">Execution logic Summary</p>
-                             <h4 className="text-2xl font-black text-foreground leading-[1.3] tracking-tight">
+                          <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="p-10 rounded-[3rem] border-4 border-primary/20 bg-gradient-to-br from-primary/10 to-transparent relative overflow-hidden group shadow-2xl shadow-primary/5">
+                             <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-125 transition-all duration-1000 pointer-events-none"><Sparkles className="w-40 h-40 text-primary" /></div>
+                             <p className="text-[10px] font-black uppercase text-primary tracking-[0.4em] mb-6">Execution Pattern Hub</p>
+                             <motion.h4 key={getRulePreview()} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-2xl font-black text-foreground leading-[1.3] tracking-tight">
                                "{getRulePreview()}"
-                             </h4>
-                          </div>
+                             </motion.h4>
+                          </motion.div>
 
-                          {/* SAVINGS ESTIMATE CARD */}
                           <div className="grid md:grid-cols-2 gap-4">
-                            <div className="p-6 bg-success/5 rounded-[1.5rem] border border-success/20 flex flex-col gap-3">
-                               <p className="text-[10px] font-black uppercase text-success tracking-widest leading-none">Monthly Estimate</p>
-                               <p className="text-2xl font-black text-success">₹950.00 <span className="text-xs font-bold opacity-70">avg</span></p>
-                               <div className="mt-2 h-1.5 w-full bg-success/10 rounded-full overflow-hidden">
-                                 <motion.div initial={{ width: 0 }} animate={{ width: "65%" }} className="h-full bg-success rounded-full" />
-                               </div>
-                            </div>
-                            <div className="p-6 bg-muted/50 rounded-[1.5rem] border border-border/50 flex flex-col gap-3">
-                               <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest leading-none">Security check</p>
-                               <div className="flex items-center gap-2">
-                                 <ShieldCheck className="w-4 h-4 text-primary" />
-                                 <span className="text-xs font-bold">Encrypted Storage</span>
-                               </div>
-                               <div className="flex items-center gap-2">
-                                 <CheckCircle2 className="w-4 h-4 text-success" />
-                                 <span className="text-xs font-bold">Verified Destination</span>
-                               </div>
-                            </div>
-                          </div>
-
-                          <div className="space-y-4">
-                             <label className="text-xs font-black uppercase text-muted-foreground tracking-widest px-1 ml-0.5">Automation Handle (Rule Name)</label>
-                             <Input 
-                              value={ruleName} 
-                              onChange={(e) => setRuleName(e.target.value)} 
-                              placeholder="e.g., Lifestyle Tax Logic"
-                              className="rounded-2xl h-16 font-black text-lg px-8 border-2 border-border/50 bg-card shadow-sm focus:ring-primary"
-                             />
+                            <motion.div initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.1 }} className="p-6 bg-success/5 rounded-3xl border border-success/20 flex flex-col gap-2">
+                               <p className="text-[10px] font-black uppercase text-success tracking-widest leading-none">Simulated Impact</p>
+                               <p className="text-2xl font-black text-success">₹1,450 <span className="text-xs font-bold opacity-70"> / month</span></p>
+                            </motion.div>
+                            <motion.div initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 0.2 }} className="p-6 bg-muted/50 rounded-3xl border border-border/50 flex flex-col gap-2">
+                               <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest leading-none">Deployment Status</p>
+                               <div className="flex items-center gap-2 text-primary font-bold text-xs"><div className="w-2 h-2 rounded-full bg-primary animate-pulse" /> ENGINE CONFIGURED</div>
+                            </motion.div>
                           </div>
                         </div>
                       )}
 
-                      {/* STEP 6: SUCCESS */}
-                      {currentStep === 6 && (
+                      {/* STEP 7: READY TO DEPLOY */}
+                      {currentStep === 7 && (
                         <div className="flex-1 flex flex-col items-center justify-center text-center py-12 space-y-8">
                           <div className="relative">
-                            <motion.div 
-                              initial={{ scale: 0, rotate: -45 }}
-                              animate={{ scale: 1, rotate: 0 }}
-                              transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.2 }}
-                              className="w-40 h-40 rounded-[2.5rem] bg-success/20 flex items-center justify-center relative z-10 shadow-lg shadow-success/10"
-                            >
-                              <CheckCircle2 className="w-20 h-20 text-success" />
+                            <motion.div initial={{ scale: 0, rotate: -90 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: "spring", stiffness: 200, damping: 20, delay: 0.2 }} className="w-48 h-48 rounded-[3rem] bg-success/20 flex items-center justify-center relative z-10 shadow-2xl shadow-success/20">
+                              <CheckCircle2 className="w-24 h-24 text-success" />
                             </motion.div>
-                            {/* PREMIUM PARTICLE BURST */}
-                            {[...Array(16)].map((_, i) => (
-                               <motion.div
-                                  key={i}
-                                  initial={{ x: 0, y: 0, opacity: 1, scale: 1 }}
-                                  animate={{ 
-                                    x: Math.cos(i * 22.5 * Math.PI / 180) * 140,
-                                    y: Math.sin(i * 22.5 * Math.PI / 180) * 140,
-                                    opacity: 0,
-                                    scale: 0.3
-                                  }}
-                                  transition={{ duration: 1.2, delay: 0.2, ease: "easeOut" }}
-                                  className={`absolute inset-0 m-auto w-3.5 h-3.5 rounded-full ${i % 4 === 0 ? 'bg-primary' : i % 4 === 1 ? 'bg-success' : i % 4 === 2 ? 'bg-warning' : 'bg-blue-400'}`}
-                               />
+                            {[...Array(20)].map((_, i) => (
+                               <motion.div key={i} initial={{ x: 0, y: 0, opacity: 1, scale: 1 }} animate={{ x: Math.cos(i * 18 * Math.PI / 180) * 180, y: Math.sin(i * 18 * Math.PI / 180) * 180, opacity: 0, scale: 0.3 }} transition={{ duration: 1.5, delay: 0.2, ease: "easeOut" }} className={`absolute inset-0 m-auto w-4 h-4 rounded-full ${i % 3 === 0 ? 'bg-primary' : i % 3 === 1 ? 'bg-success' : i % 3 === 2 ? 'bg-warning' : 'bg-blue-400'}`} />
                             ))}
                           </div>
-
                           <div className="space-y-3">
-                             <h2 className="text-4xl font-black font-heading tracking-tighter">SUCCESS!</h2>
-                             <p className="text-muted-foreground max-w-xs mx-auto leading-relaxed">Your capital is now working for you automatically. Logic active.</p>
+                             <motion.h2 initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.4 }} className="text-5xl font-black font-heading tracking-tighter">DEPLOΥED</motion.h2>
+                             <motion.p initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.5 }} className="text-muted-foreground max-w-xs mx-auto font-medium leading-relaxed">Automation engine initialized. Logic active across all transaction clusters.</p>
                           </div>
-
-                          <Button 
-                            onClick={() => setIsBuilderOpen(false)} 
-                            variant="outline" 
-                            className="rounded-[1.25rem] px-14 h-14 font-black transition-all hover:bg-muted hover:scale-105 active:scale-95 border-2"
-                          >
-                             Return to Dashboard
-                          </Button>
+                          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.6 }}>
+                            <Button onClick={() => setIsBuilderOpen(false)} variant="outline" className="rounded-3xl px-16 h-16 font-black border-2 hover:bg-muted hover:scale-105 active:scale-95 transition-all shadow-xl">Back to HQ</Button>
+                          </motion.div>
                         </div>
                       )}
-
                     </motion.div>
                   </AnimatePresence>
                 </div>
               </div>
 
-              {/* STICKY FOOTER NAVIGATION */}
+              {/* STICKY FOOTER */}
               <AnimatePresence>
-                {currentStep < 6 && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 20 }}
-                    className="sticky bottom-0 z-30 px-6 md:px-10 py-6 border-t border-border/30 flex items-center justify-between bg-card/80 backdrop-blur-xl"
-                  >
-                    <Button 
-                      onClick={handleBack} 
-                      disabled={currentStep === 1}
-                      variant="ghost" 
-                      className="rounded-2xl font-black h-14 px-8 gap-3 text-muted-foreground hover:bg-muted hover:text-foreground active:scale-95 disabled:opacity-30"
-                    >
+                {currentStep < 7 && (
+                  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="sticky bottom-0 z-30 px-6 md:px-10 py-6 border-t border-border/30 flex items-center justify-between bg-card/80 backdrop-blur-xl">
+                    <Button onClick={handleBack} disabled={currentStep === 1} variant="ghost" className="rounded-2xl font-black h-14 px-8 gap-3 text-muted-foreground hover:bg-muted hover:text-foreground active:scale-95 disabled:opacity-30">
                       <ChevronLeft className="w-5 h-5" /> Back
                     </Button>
-                    
-                    {currentStep === 5 ? (
-                      <Button onClick={handleSaveRule} className="rounded-2xl gradient-primary text-primary-foreground font-black px-12 h-14 shadow-2xl shadow-primary/30 hover:scale-105 transition-all active:scale-95 ring-4 ring-primary/5">
+                    {currentStep === 6 ? (
+                      <Button onClick={handleSaveRule} className="rounded-2xl gradient-primary text-primary-foreground font-black px-12 h-14 shadow-2xl shadow-primary/30 hover:scale-[1.05] transition-all active:scale-95">
                         DEPLOY ENGINE <Sparkles className="w-5 h-5 ml-2" />
                       </Button>
                     ) : (
-                      <Button onClick={handleNext} className="rounded-2xl bg-primary text-primary-foreground font-black px-12 h-14 hover:bg-primary/90 shadow-xl shadow-primary/20 active:scale-95">
+                      <Button onClick={handleNext} className="rounded-2xl bg-primary text-primary-foreground font-black px-12 h-14 hover:bg-primary/90 shadow-xl shadow-primary/20 active:scale-95 transition-all">
                         NEXT STEP <ChevronRight className="w-5 h-5 ml-2" />
                       </Button>
                     )}
