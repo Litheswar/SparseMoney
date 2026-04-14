@@ -12,6 +12,58 @@ export interface WalletState {
   totalInvested: number;
 }
 
+// === GROUP SAVING ENGINE ===
+export type GroupCategory = 'Trip ✈️' | 'Event 🎉' | 'Emergency 🛡️' | 'Custom';
+export type GroupContributionMode = 'Equal contribution' | 'Custom contribution' | '% based contribution';
+
+export interface GroupMember {
+  userId: string;
+  name: string;
+  avatar?: string;
+  totalContributed: number;
+  contributionShare: number; // 0-100 percentage
+  lastActive: string; // ISO String
+  badges: string[];
+}
+
+export interface GroupContribution {
+  id: string;
+  groupId: string;
+  userId: string;
+  userName: string;
+  amount: number;
+  source: 'roundup' | 'manual';
+  timestamp: Date;
+}
+
+export interface Group {
+  id: string;
+  name: string;
+  goalAmount: number;
+  totalSaved: number;
+  category: GroupCategory;
+  emoji: string;
+  targetDate: string; // ISO String
+  contributionMode: GroupContributionMode;
+  inviteCode: string;
+  members: GroupMember[];
+  createdBy: string;
+  createdAt: string;
+  lastActivity?: {
+    userName: string;
+    amount: number;
+    timestamp: Date;
+  };
+  energyScore: number; // 0-100
+  urgencyStatus: 'On track' | 'Slight delay' | 'Risk';
+  trendData: number[]; // Array of past contribution amounts
+  smartOptions: {
+    autoRoundUp: boolean;
+    weeklyFixed: boolean;
+    penaltyNudge: boolean;
+  };
+}
+
 export function addToWallet(wallet: WalletState, amount: number): WalletState {
   return {
     ...wallet,

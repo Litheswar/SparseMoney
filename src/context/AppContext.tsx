@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { Transaction, WalletState, Rule, generateTransaction, addToWallet, triggerInvestment, calculateRoundUp, DEFAULT_RULES, MOCK_PORTFOLIO, Investment, evaluateCondition } from '@/lib/engine';
+import { Transaction, WalletState, Rule, generateTransaction, addToWallet, triggerInvestment, calculateRoundUp, DEFAULT_RULES, MOCK_PORTFOLIO, Investment, evaluateCondition, Group, GroupMember, GroupContribution } from '@/lib/engine';
 
 interface Notification {
   id: string;
@@ -16,6 +16,8 @@ interface AppState {
   notifications: Notification[];
   weeklySpare: number;
   growthPercent: number;
+  groups: Group[];
+  groupContributions: GroupContribution[];
 }
 
 interface AppContextType extends AppState {
@@ -30,6 +32,8 @@ interface AppContextType extends AppState {
   setIsStreaming: (v: boolean) => void;
   lastInvestment: { amount: number; timestamp: Date; ruleName: string } | null;
   automationImpact: number;
+  createGroup: (group: Omit<Group, 'id' | 'totalSaved' | 'members' | 'inviteCode' | 'createdAt'>) => void;
+  addContributionToGroup: (groupId: string, amount: number, source: 'roundup' | 'manual') => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -40,6 +44,57 @@ const INITIAL_WALLET: WalletState = {
   totalSaved: 3420,
   totalInvested: 9400,
 };
+
+const INITIAL_GROUPS: Group[] = [
+  {
+    id: 'g-1',
+    name: 'Goa Trip 🏖️',
+    goalAmount: 25000,
+    totalSaved: 14200,
+    category: 'Trip ✈️',
+    emoji: '🏖️',
+    targetDate: new Date(Date.now() + 45 * 86400000).toISOString(),
+    contributionMode: 'Equal contribution',
+    inviteCode: 'GOA123',
+    members: [
+      { userId: 'u1', name: 'Arjun', totalContributed: 5200, contributionShare: 36, lastActive: new Date().toISOString(), badges: ['Top Contributor', 'Consistent Saver'] },
+      { userId: 'u2', name: 'Ravi', totalContributed: 4800, contributionShare: 34, lastActive: new Date(Date.now() - 3600000).toISOString(), badges: ['Consistent Saver'] },
+      { userId: 'u3', name: 'Sneha', totalContributed: 4200, contributionShare: 30, lastActive: new Date(Date.now() - 7200000).toISOString(), badges: [] },
+    ],
+    createdBy: 'u1',
+    createdAt: new Date(Date.now() - 30 * 86400000).toISOString(),
+    energyScore: 88,
+    urgencyStatus: 'On track',
+    trendData: [100, 250, 400, 300, 600, 800, 450],
+    smartOptions: { autoRoundUp: true, weeklyFixed: true, penaltyNudge: true }
+  },
+  {
+    id: 'g-2',
+    name: 'Emergency Fund 🛡️',
+    goalAmount: 50000,
+    totalSaved: 12400,
+    category: 'Emergency 🛡️',
+    emoji: '🛡️',
+    targetDate: new Date(Date.now() + 180 * 86400000).toISOString(),
+    contributionMode: 'Custom contribution',
+    inviteCode: 'SAFE456',
+    members: [
+      { userId: 'u1', name: 'Arjun', totalContributed: 12400, contributionShare: 100, lastActive: new Date().toISOString(), badges: ['Top Contributor'] },
+    ],
+    createdBy: 'u1',
+    createdAt: new Date(Date.now() - 60 * 86400000).toISOString(),
+    energyScore: 45,
+    urgencyStatus: 'Slight delay',
+    trendData: [50, 120, 80, 200, 150, 300, 100],
+    smartOptions: { autoRoundUp: true, weeklyFixed: false, penaltyNudge: false }
+  }
+];
+
+const INITIAL_CONTRIBUTIONS: GroupContribution[] = [
+  { id: 'c1', groupId: 'g-1', userId: 'u2', userName: 'Ravi', amount: 20, source: 'roundup', timestamp: new Date(Date.now() - 120000) },
+  { id: 'c2', groupId: 'g-1', userId: 'u1', userName: 'Arjun', amount: 50, source: 'manual', timestamp: new Date(Date.now() - 300000) },
+  { id: 'c3', groupId: 'g-1', userId: 'u3', userName: 'Sneha', amount: 30, source: 'manual', timestamp: new Date(Date.now() - 600000) },
+];
 
 // Generate initial transactions
 function generateInitialTransactions(count: number): Transaction[] {
@@ -58,6 +113,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [rules, setRules] = useState<Rule[]>(DEFAULT_RULES);
   const [portfolio] = useState<Investment[]>(MOCK_PORTFOLIO);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [groups, setGroups] = useState<Group[]>(INITIAL_GROUPS);
+  const [groupContributions, setGroupContributions] = useState<GroupContribution[]>(INITIAL_CONTRIBUTIONS);
   const [isStreaming, setIsStreaming] = useState(false);
   const [lastInvestment, setLastInvestment] = useState<{ amount: number; timestamp: Date; ruleName: string } | null>(null);
   const streamRef = useRef<ReturnType<typeof setInterval>>();
@@ -186,6 +243,44 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setNotifications(prev => prev.filter(n => n.id !== id));
   }, []);
 
+  const createGroup = useCallback((groupData: Omit<Group, 'id' | 'totalSaved' | 'members' | 'inviteCode' | 'createdAt'>) => {
+    const newGroup: Group = {
+      ...groupData,
+      id: `g-${Date.now()}`,
+      totalSaved: 0,
+      inviteCode: Math.random().toString(36).substring(2, 8).toUpperCase(),
+      createdAt: new Date().toISOString(),
+      members: [
+        { userId: 'u1', name: 'Arjun', totalContributed: 0, lastActive: new Date().toISOString(), badges: [] }
+      ]
+    };
+    setGroups(prev => [newGroup, ...prev]);
+    addNotification(`Group "${newGroup.name}" created!`, 'success');
+  }, [addNotification]);
+
+  const addContributionToGroup = useCallback((groupId: string, amount: number, source: 'roundup' | 'manual') => {
+    const contribution: GroupContribution = {
+      id: `c-${Date.now()}`,
+      groupId,
+      userId: 'u1',
+      userName: 'Arjun',
+      amount,
+      source,
+      timestamp: new Date()
+    };
+    setGroupContributions(prev => [contribution, ...prev].slice(0, 50));
+    setGroups(prev => prev.map(g => {
+      if (g.id === groupId) {
+        return {
+          ...g,
+          totalSaved: g.totalSaved + amount,
+          members: g.members.map(m => m.userId === 'u1' ? { ...m, totalContributed: m.totalContributed + amount, lastActive: new Date().toISOString() } : m)
+        };
+      }
+      return g;
+    }));
+  }, []);
+
   // Streaming mode
   useEffect(() => {
     if (isStreaming) {
@@ -197,6 +292,42 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
     return () => clearInterval(streamRef.current);
   }, [isStreaming, simulateTransaction]);
+
+  // Group Simulation logic
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const luckyGroup = groups[Math.floor(Math.random() * groups.length)];
+      if (!luckyGroup) return;
+      
+      const luckyMember = luckyGroup.members[Math.floor(Math.random() * luckyGroup.members.length)];
+      if (!luckyMember) return;
+      
+      const amount = Math.floor(Math.random() * 50) + 10;
+      
+      setGroups(prev => prev.map(g => {
+        if (g.id === luckyGroup.id) {
+          return {
+            ...g,
+            totalSaved: g.totalSaved + amount,
+            lastActivity: {
+              userName: luckyMember.name,
+              amount,
+              timestamp: new Date()
+            },
+            energyScore: Math.min(100, g.energyScore + 2),
+            members: g.members.map(m => m.userId === luckyMember.userId ? {
+              ...m,
+              totalContributed: m.totalContributed + amount,
+              lastActive: new Date().toISOString()
+            } : m)
+          };
+        }
+        return g;
+      }));
+    }, 8000); // Simulate every 8s
+
+    return () => clearInterval(interval);
+  }, [groups]);
 
   const weeklySpare = transactions
     .filter(t => t.timestamp > new Date(Date.now() - 7 * 86400000))
@@ -211,7 +342,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       wallet, transactions, rules, portfolio, notifications,
       weeklySpare, growthPercent, isStreaming, setIsStreaming,
       simulateTransaction, toggleRule, clearNotification, lastInvestment,
-      addRule, updateRule, deleteRule, duplicateRule, automationImpact
+      addRule, updateRule, deleteRule, duplicateRule, automationImpact,
+      groups, groupContributions, createGroup, addContributionToGroup
     }}>
       {children}
     </AppContext.Provider>

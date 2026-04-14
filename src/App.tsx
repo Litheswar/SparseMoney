@@ -16,6 +16,7 @@ import UserInsights from "./pages/user/UserInsights";
 import UserRules from "./pages/user/UserRules";
 import UserHorizon from "./pages/user/UserHorizon";
 import UserGroups from "./pages/user/UserGroups";
+import GroupDetails from "./pages/user/GroupDetails";
 import UserProfile from "./pages/user/UserProfile";
 import AdminOverview from "./pages/admin/AdminOverview";
 import AdminTransactions from "./pages/admin/AdminTransactions";
@@ -78,6 +79,7 @@ function AppRoutes() {
       <Route path="/dashboard/rules" element={<DashboardLayout><UserRules /></DashboardLayout>} />
       <Route path="/dashboard/horizon" element={<DashboardLayout><UserHorizon /></DashboardLayout>} />
       <Route path="/dashboard/groups" element={<DashboardLayout><UserGroups /></DashboardLayout>} />
+      <Route path="/dashboard/groups/:id" element={<DashboardLayout><GroupDetails /></DashboardLayout>} />
       <Route path="/dashboard/profile" element={<DashboardLayout><UserProfile /></DashboardLayout>} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

@@ -129,7 +129,35 @@
     from { opacity: 0; transform: translateY(20px); }
     to { opacity: 1; transform: translateY(0); }
   }
-  @keyframes coin-drop {
+  .animate-count-up { animation: count-up 0.5s ease-out forwards; }
+  .animate-slide-in-up { animation: slide-in-up 0.4s ease-out forwards; }
+  .animate-coin-drop {
+    animation: coin-drop 0.5s ease-out forwards;
+  }
+
+  .animate-shimmer {
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0.05) 50%,
+      rgba(255, 255, 255, 0) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+  }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes coin-drop {
     0% { opacity: 0; transform: translateY(-20px) scale(0.5); }
     60% { opacity: 1; transform: translateY(5px) scale(1.1); }
     100% { opacity: 1; transform: translateY(0) scale(1); }
@@ -161,4 +189,28 @@
   }
   .animate-check-draw { animation: check-draw 0.4s ease-out forwards; }
   .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
+  .animate-breathing-glow {
+    animation: breathing-shadow 3s ease-in-out infinite;
+  }
+
+  /* Status Colors & Glows */
+  .shadow-success-glow {
+    box-shadow: 0 0 15px -3px hsl(var(--success) / 0.3);
+  }
+  .shadow-warning-glow {
+    box-shadow: 0 0 15px -3px hsl(var(--warning) / 0.3);
+  }
+  .shadow-risk-glow {
+    box-shadow: 0 0 15px -3px hsl(var(--risk) / 0.3);
+  }
+
+  @keyframes breathing-shadow {
+    0%, 100% { opacity: 0.6; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.05); }
+  }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
 }
