@@ -149,10 +149,29 @@ export default function OnboardingPage() {
             <Shield className="h-4 w-4" />
             RBI Account Aggregator onboarding
           </motion.div>
-          <div className="mx-auto grid max-w-sm grid-cols-4 gap-2">
-            {stepOrder.map((item, index) => (
-              <div key={item} className={`h-1.5 rounded-full ${index <= currentStepIndex ? 'bg-primary' : 'bg-primary/15'}`} />
-            ))}
+          <div className="mx-auto flex w-full max-w-md items-center justify-between gap-1 overflow-x-auto px-1 pb-2 scrollbar-none" style={{ flexWrap: 'nowrap' }}>
+            {stepOrder.map((item, index) => {
+              const isActive = index === currentStepIndex;
+              const isPast = index < currentStepIndex;
+              return (
+                <div key={item} className="flex min-w-[75px] flex-1 flex-col items-center gap-1.5 shrink-0 px-0.5">
+                  <div className={`h-1.5 w-full rounded-full transition-all duration-500 overflow-hidden relative ${isPast ? 'bg-success' : 'bg-primary/15'}`}>
+                    <motion.div 
+                      className={`absolute left-0 top-0 h-full rounded-full ${isActive ? 'bg-primary' : isPast ? 'bg-success' : 'bg-transparent'}`}
+                      initial={{ width: isActive ? '50%' : isPast ? '100%' : '0%' }}
+                      animate={{ width: isActive ? '100%' : isPast ? '100%' : '0%' }}
+                      transition={{ duration: 0.5 }}
+                    />
+                  </div>
+                  <motion.span 
+                    animate={{ scale: isActive ? 1.05 : 1 }}
+                    className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 transition-colors duration-300 ${isActive ? 'text-primary' : isPast ? 'text-success' : 'text-muted-foreground/60'}`}
+                  >
+                    {item === 'connecting' ? 'Processing' : item} {isPast && <Check className="w-2.5 h-2.5" />}
+                  </motion.span>
+                </div>
+              );
+            })}
           </div>
         </div>
 
