@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { useApp } from '@/context/AppContext';
+import NotificationPanel from './NotificationPanel';
 
 const userNav = [
   { to: '/dashboard', icon: Home, label: 'Home' },
@@ -33,9 +35,13 @@ const adminNav = [
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
+  const { notifications } = useApp();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const location = useLocation();
   const navItems = user?.role === 'admin' ? adminNav : userNav;
+
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -112,7 +118,32 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <h2 className="text-sm font-medium text-muted-foreground">
             {user?.role === 'admin' ? 'Admin Dashboard' : 'Dashboard'}
           </h2>
+
+          <div className="ml-auto flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsNotificationsOpen(true)}
+              className="relative rounded-full hover:bg-muted/50 transition-colors group"
+            >
+              <Bell className="w-5 h-5 text-foreground group-hover:text-primary transition-colors" />
+              {unreadCount > 0 && (
+                <motion.span 
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="absolute top-2 right-2 w-4 h-4 rounded-full bg-rose-500 text-[10px] font-bold text-white flex items-center justify-center border-2 border-background shadow-sm"
+                >
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </motion.span>
+              )}
+            </Button>
+          </div>
         </header>
+
+        <NotificationPanel 
+          isOpen={isNotificationsOpen} 
+          onClose={() => setIsNotificationsOpen(false)} 
+        />
         <main className="flex-1 p-4 lg:p-6">
           <motion.div
             key={location.pathname}

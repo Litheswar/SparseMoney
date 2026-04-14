@@ -1,15 +1,19 @@
-import { useAuth } from '@/context/AuthContext';
-import { motion } from 'framer-motion';
-import { UserCircle, Bell, Shield, Wallet, Calculator } from 'lucide-react';
-import { Switch } from '@/components/ui/switch';
-import { Slider } from '@/components/ui/slider';
 import { useState } from 'react';
+import { useApp } from '@/context/AppContext';
 
 export default function UserProfile() {
   const { user } = useAuth();
+  const { notificationSettings, updateNotificationSettings } = useApp();
   const [threshold, setThreshold] = useState([500]);
-  const [notifications, setNotifications] = useState({ roundUp: true, invest: true, weekly: true, risk: false });
   const [allocation, setAllocation] = useState({ gold: 30, index: 40, debt: 20, fd: 10 });
+
+  const settingLabels: Record<keyof typeof notificationSettings, string> = {
+    thresholdAlerts: 'Investment Success Alerts',
+    lowBalanceAlerts: 'Low Balance Warnings',
+    failedDeductions: 'Failed Deduction Alerts',
+    streakNotifications: 'Streak & Habits',
+    insightNotifications: 'Smart Financial Insights',
+  };
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -88,13 +92,28 @@ export default function UserProfile() {
       <div className="glass-card p-5">
         <div className="flex items-center gap-2 mb-4">
           <Bell className="w-5 h-5 text-primary" />
-          <h3 className="text-base font-semibold font-heading text-foreground">Notifications</h3>
+          <h3 className="text-base font-semibold font-heading text-foreground">Notification Preferences</h3>
         </div>
-        <div className="space-y-3">
-          {Object.entries(notifications).map(([key, val]) => (
+        <div className="space-y-4">
+          {Object.entries(notificationSettings).map(([key, val]) => (
             <div key={key} className="flex items-center justify-between">
-              <span className="text-sm text-foreground capitalize">{key === 'roundUp' ? 'Round-up alerts' : key === 'invest' ? 'Investment triggers' : key === 'weekly' ? 'Weekly reports' : 'Risk warnings'}</span>
-              <Switch checked={val} onCheckedChange={v => setNotifications(n => ({ ...n, [key]: v }))} />
+              <div className="space-y-0.5">
+                <span className="text-sm font-medium text-foreground">
+                  {settingLabels[key as keyof typeof notificationSettings]}
+                </span>
+                <p className="text-[10px] text-muted-foreground">
+                  {key === 'thresholdAlerts' ? 'Get notified when your savings hit the goal' :
+                   key === 'lowBalanceAlerts' ? 'Alert when your account is running low' :
+                   key === 'failedDeductions' ? 'Alerts for failed automated transactions' :
+                   key === 'streakNotifications' ? 'Encouragement for your saving streaks' :
+                   'Personalized tips based on your spending'}
+                </p>
+              </div>
+              <Switch 
+                checked={val} 
+                onCheckedChange={v => updateNotificationSettings({ [key]: v })} 
+                className="data-[state=checked]:bg-primary"
+              />
             </div>
           ))}
         </div>

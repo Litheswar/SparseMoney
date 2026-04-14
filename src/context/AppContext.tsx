@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { toast } from 'sonner';
 import { 
   Group, GroupMember, GroupContribution 
 } from '@/lib/engine';
@@ -17,11 +18,27 @@ import {
   SuggestedRule,
 } from '@/lib/automation';
 
-interface Notification {
+export type NotificationType = 'info' | 'success' | 'warning' | 'error' | 'insight';
+export type NotificationCategory = 'alert' | 'success' | 'insight' | 'streak';
+
+export interface Notification {
   id: string;
-  message: string;
-  type: 'info' | 'success' | 'warning';
+  title: string;
+  description: string;
+  type: NotificationType;
+  category: NotificationCategory;
   timestamp: string;
+  read: boolean;
+  amount?: number;
+  actionLabel?: string;
+}
+
+interface NotificationSettings {
+  thresholdAlerts: boolean;
+  lowBalanceAlerts: boolean;
+  failedDeductions: boolean;
+  streakNotifications: boolean;
+  insightNotifications: boolean;
 }
 
 interface AutomationStats {
@@ -40,6 +57,7 @@ interface PersistedAppState {
   rules: Rule[];
   portfolio: Investment[];
   notifications: Notification[];
+  notificationSettings: NotificationSettings;
   destinationBalances: Record<RuleDestination, number>;
   recentExecutions: RuleExecution[];
   lastInvestment: { amount: number; timestamp: string } | null;
@@ -62,13 +80,22 @@ interface AppContextType extends AppState {
   updateRule: (rule: Rule) => void;
   deleteRule: (id: string) => void;
   clearNotification: (id: string) => void;
+  markNotificationAsRead: (id: string) => void;
+  markAllNotificationsAsRead: () => void;
+  updateNotificationSettings: (settings: Partial<NotificationSettings>) => void;
   isStreaming: boolean;
   setIsStreaming: (value: boolean) => void;
   lastInvestment: { amount: number; timestamp: string } | null;
   automationImpact: number;
   createGroup: (group: Omit<Group, 'id' | 'totalSaved' | 'members' | 'inviteCode' | 'createdAt' | 'energyScore' | 'urgencyStatus' | 'trendData'>) => void;
   addContributionToGroup: (groupId: string, amount: number, source: 'roundup' | 'manual') => void;
-  addNotification: (message: string, type: 'info' | 'success' | 'warning') => void;
+  addNotification: (
+    title: string, 
+    description: string, 
+    type: NotificationType, 
+    category: NotificationCategory,
+    amount?: number
+  ) => void;
 }
 
 const STORAGE_KEY = 'sparesmart-automation-engine-v1';
@@ -143,6 +170,14 @@ function generateInitialTransactions(count: number): Transaction[] {
   return transactions;
 }
 
+const INITIAL_NOTIFICATION_SETTINGS: NotificationSettings = {
+  thresholdAlerts: true,
+  lowBalanceAlerts: true,
+  failedDeductions: true,
+  streakNotifications: true,
+  insightNotifications: true,
+};
+
 function createSeedState(): PersistedAppState {
   return {
     wallet: INITIAL_WALLET,
@@ -152,17 +187,25 @@ function createSeedState(): PersistedAppState {
     notifications: [
       {
         id: 'seed-note-1',
-        message: 'Weekend Food Control moved ₹50 into Gold ETF.',
+        title: 'Investment Executed',
+        description: '₹500 invested into Index Fund after threshold hit.',
         type: 'success',
+        category: 'success',
         timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+        read: true,
+        amount: 500
       },
       {
         id: 'seed-note-2',
-        message: 'Smart Round-Up routed ₹8 into Wallet.',
-        type: 'info',
+        title: 'Low Balance Alert',
+        description: 'Your wallet balance is below ₹500. Consider pausing some rules.',
+        type: 'warning',
+        category: 'alert',
         timestamp: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
+        read: false
       },
     ],
+    notificationSettings: INITIAL_NOTIFICATION_SETTINGS,
     destinationBalances: DEFAULT_DESTINATION_BALANCES,
     recentExecutions: DEFAULT_RULE_EXECUTIONS,
     lastInvestment: null,
@@ -185,12 +228,14 @@ function loadPersistedState(): PersistedAppState {
     const stored = window.localStorage.getItem(STORAGE_KEY);
     if (!stored) return createSeedState();
     const parsed = JSON.parse(stored);
+    const seed = createSeedState();
     return {
-      ...createSeedState(),
+      ...seed,
       ...parsed,
       transactions: (parsed.transactions || []).map(reviveTransaction),
       groups: parsed.groups || INITIAL_GROUPS,
       groupContributions: (parsed.groupContributions || []).map((c: any) => ({ ...c, timestamp: new Date(c.timestamp) })),
+      notificationSettings: parsed.notificationSettings || seed.notificationSettings,
     };
   } catch {
     return createSeedState();
@@ -271,11 +316,65 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [state]);
 
-  const addNotification = useCallback((message: string, type: 'info' | 'success' | 'warning') => {
+  const addNotification = useCallback((
+    title: string, 
+    description: string, 
+    type: NotificationType, 
+    category: NotificationCategory,
+    amount?: number
+  ) => {
+    // Check settings before adding
+    const currentSettings = stateRef.current.notificationSettings;
+    if (category === 'alert' && type === 'warning' && !currentSettings.lowBalanceAlerts) return;
+    if (category === 'alert' && type === 'error' && !currentSettings.failedDeductions) return;
+    if (category === 'success' && !currentSettings.thresholdAlerts) return;
+    if (category === 'streak' && !currentSettings.streakNotifications) return;
+    if (category === 'insight' && !currentSettings.insightNotifications) return;
+
     const id = Math.random().toString(36).substring(7);
     setState(prev => ({
       ...prev,
-      notifications: [{ id, message, type, timestamp: new Date().toISOString() }, ...prev.notifications].slice(0, 20)
+      notifications: [
+        { 
+          id, 
+          title, 
+          description, 
+          type, 
+          category, 
+          amount,
+          read: false,
+          timestamp: new Date().toISOString() 
+        }, 
+        ...prev.notifications
+      ].slice(0, 50)
+    }));
+
+    // Trigger Toast
+    toast(title, {
+      description,
+      duration: 5000,
+      icon: category === 'success' ? '🎉' : category === 'alert' ? '⚠️' : '🧠',
+    });
+  }, []);
+
+  const markNotificationAsRead = useCallback((id: string) => {
+    setState(prev => ({
+      ...prev,
+      notifications: prev.notifications.map(n => n.id === id ? { ...n, read: true } : n)
+    }));
+  }, []);
+
+  const markAllNotificationsAsRead = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      notifications: prev.notifications.map(n => ({ ...n, read: true }))
+    }));
+  }, []);
+
+  const updateNotificationSettings = useCallback((settings: Partial<NotificationSettings>) => {
+    setState(prev => ({
+      ...prev,
+      notificationSettings: { ...prev.notificationSettings, ...settings }
     }));
   }, []);
 
@@ -319,6 +418,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       nextWallet = thresholdResult.wallet;
       nextPortfolio = addAmountToPortfolio(nextPortfolio, 'Index Fund', thresholdResult.amount);
       lastInvestment = { amount: thresholdResult.amount, timestamp: new Date().toISOString() };
+      
+      // Trigger Notification
+      addNotification(
+        '🎉 Investment Executed!',
+        `${formatCurrency(thresholdResult.amount)} invested into Index Fund after reaching threshold.`,
+        'success',
+        'success',
+        thresholdResult.amount
+      );
+    }
+
+    // Low Balance Check
+    if (nextWallet.balance < 500 && current.wallet.balance >= 500) {
+      addNotification(
+        '⚠️ Low Balance Alert',
+        `Your wallet balance has dropped below ${formatCurrency(500)}. Savings may slow down.`,
+        'warning',
+        'alert'
+      );
+    }
+
+    // Simulated Failed Deduction (2% chance)
+    if (Math.random() < 0.02) {
+      addNotification(
+        '❌ Transaction Failed',
+        'Unable to deduct round-up for the last transaction due to bank timeout.',
+        'error',
+        'alert'
+      );
     }
 
     setState(prev => ({
@@ -335,7 +463,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     clearTimeout(flashTimeoutRef.current);
     flashTimeoutRef.current = setTimeout(() => setHighlightedRuleIds([]), 1800);
     return transaction;
-  }, []);
+  }, [addNotification]);
 
   const createGroup = useCallback((groupData: Omit<Group, 'id' | 'totalSaved' | 'members' | 'inviteCode' | 'createdAt' | 'energyScore' | 'urgencyStatus' | 'trendData'>) => {
     const newGroup: Group = {
@@ -352,7 +480,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       ]
     };
     setState(prev => ({ ...prev, groups: [newGroup, ...prev.groups] }));
-    addNotification(`Group "${newGroup.name}" created!`, 'success');
+    addNotification('Group Created!', `Group "${newGroup.name}" has been created successfully.`, 'success', 'success');
   }, [addNotification]);
 
   const addContributionToGroup = useCallback((groupId: string, amount: number, source: 'roundup' | 'manual') => {
@@ -397,6 +525,38 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(streamRef.current);
   }, [isStreaming, simulateTransaction]);
 
+  // Smart Insights & Streaks Simulation
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!isStreaming) return;
+      
+      const rand = Math.random();
+      if (rand < 0.3) {
+        addNotification(
+          '🔥 5-Day Saving Streak!',
+          "You've saved for 5 days in a row. You're building a great habit!",
+          'insight',
+          'streak'
+        );
+      } else if (rand < 0.6) {
+        addNotification(
+          '🎯 Goal Progress',
+          "You're 80% closer to your Goa Trip 🏖️ goal. Keep it up!",
+          'success',
+          'success'
+        );
+      } else {
+        addNotification(
+          '🧠 Smart Insight',
+          "You spent 20% more on Food this week. We suggest increasing your round-up to ₹20.",
+          'insight',
+          'insight'
+        );
+      }
+    }, 20000); // Every 20 seconds during streaming
+    return () => clearInterval(interval);
+  }, [isStreaming, addNotification]);
+
   useEffect(() => {
     const interval = setInterval(() => {
       const luckyGroup = state.groups[Math.floor(Math.random() * state.groups.length)];
@@ -426,9 +586,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           return g;
         })
       }));
-    }, 8000);
+
+      // Group Activity Notification
+      if (luckyMember.name !== 'Arjun') {
+        addNotification(
+          '👥 Group Activity',
+          `${luckyMember.name} just contributed ${formatCurrency(amount)} to ${luckyGroup.name}!`,
+          'info',
+          'success'
+        );
+      }
+    }, 12000);
     return () => clearInterval(interval);
-  }, [state.groups.length]);
+  }, [state.groups.length, addNotification]);
 
   const weeklySpare = useMemo(() => 
     state.transactions.filter(t => t.timestamp > new Date(Date.now() - 7 * 86400000)).reduce((sum, t) => sum + t.roundUp, 0),
@@ -471,10 +641,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     updateRule: (rule) => setState(prev => ({ ...prev, rules: sortRules(prev.rules.map(r => r.id === rule.id ? { ...rule, updatedAt: new Date().toISOString() } : r)) })),
     deleteRule: (id) => setState(prev => ({ ...prev, rules: prev.rules.filter(r => r.id !== id) })),
     clearNotification: (id) => setState(prev => ({ ...prev, notifications: prev.notifications.filter(n => n.id !== id) })),
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
+    updateNotificationSettings,
     createGroup,
     addContributionToGroup,
     addNotification
-  }), [state, weeklySpare, growthPercent, automationStats, highlightedRuleIds, isStreaming, simulateTransaction, createGroup, addContributionToGroup, addNotification]);
+  }), [state, weeklySpare, growthPercent, automationStats, highlightedRuleIds, isStreaming, simulateTransaction, createGroup, addContributionToGroup, addNotification, markNotificationAsRead, markAllNotificationsAsRead, updateNotificationSettings]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
