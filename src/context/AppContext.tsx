@@ -1,40 +1,76 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { Transaction, WalletState, Rule, generateTransaction, addToWallet, triggerInvestment, calculateRoundUp, DEFAULT_RULES, MOCK_PORTFOLIO, Investment, evaluateCondition, Group, GroupMember, GroupContribution } from '@/lib/engine';
+import { 
+  Transaction, WalletState, Rule, generateTransaction, addToWallet, 
+  triggerInvestment, calculateRoundUp, DEFAULT_RULES, MOCK_PORTFOLIO, 
+  Investment, evaluateCondition, Group, GroupMember, GroupContribution 
+} from '@/lib/engine';
+import {
+  createRuleDefinition,
+  createRuleExecution,
+  DEFAULT_DESTINATION_BALANCES,
+  DEFAULT_RULE_EXECUTIONS,
+  doesRuleMatch,
+  formatCurrency,
+  RuleDestination,
+  RuleExecution,
+  SuggestedRule,
+} from '@/lib/automation';
 
 interface Notification {
   id: string;
   message: string;
   type: 'info' | 'success' | 'warning';
-  timestamp: Date;
+  timestamp: string;
 }
 
-interface AppState {
+interface AutomationStats {
+  thisMonthSaved: number;
+  inactiveOpportunity: number;
+  projectedMonthlyContribution: number;
+  activeRules: number;
+  totalTriggers: number;
+  totalRouted: number;
+  topDestination: RuleDestination;
+}
+
+interface PersistedAppState {
   wallet: WalletState;
   transactions: Transaction[];
   rules: Rule[];
   portfolio: Investment[];
   notifications: Notification[];
-  weeklySpare: number;
-  growthPercent: number;
+  destinationBalances: Record<RuleDestination, number>;
+  recentExecutions: RuleExecution[];
+  lastInvestment: { amount: number; timestamp: string } | null;
   groups: Group[];
   groupContributions: GroupContribution[];
 }
 
+interface AppState extends PersistedAppState {
+  weeklySpare: number;
+  growthPercent: number;
+  automationStats: AutomationStats;
+  suggestedRules: SuggestedRule[];
+  highlightedRuleIds: string[];
+}
+
 interface AppContextType extends AppState {
   simulateTransaction: () => Transaction;
-  addRule: (rule: Omit<Rule, 'id' | 'triggerCount'>) => void;
-  updateRule: (id: string, updates: Partial<Rule>) => void;
-  deleteRule: (id: string) => void;
-  duplicateRule: (id: string) => void;
   toggleRule: (id: string) => void;
+  createRule: (rule: Rule) => void;
+  updateRule: (rule: Rule) => void;
+  deleteRule: (id: string) => void;
   clearNotification: (id: string) => void;
   isStreaming: boolean;
-  setIsStreaming: (v: boolean) => void;
-  lastInvestment: { amount: number; timestamp: Date; ruleName: string } | null;
+  setIsStreaming: (value: boolean) => void;
+  lastInvestment: { amount: number; timestamp: string } | null;
   automationImpact: number;
   createGroup: (group: Omit<Group, 'id' | 'totalSaved' | 'members' | 'inviteCode' | 'createdAt'>) => void;
   addContributionToGroup: (groupId: string, amount: number, source: 'roundup' | 'manual') => void;
+  addNotification: (message: string, type: 'info' | 'success' | 'warning') => void;
 }
+
+const STORAGE_KEY = 'sparesmart-automation-engine-v1';
 
 const AppContext = createContext<AppContextType | null>(null);
 
@@ -96,151 +132,208 @@ const INITIAL_CONTRIBUTIONS: GroupContribution[] = [
   { id: 'c3', groupId: 'g-1', userId: 'u3', userName: 'Sneha', amount: 30, source: 'manual', timestamp: new Date(Date.now() - 600000) },
 ];
 
-// Generate initial transactions
 function generateInitialTransactions(count: number): Transaction[] {
-  const txs: Transaction[] = [];
-  for (let i = 0; i < count; i++) {
-    const tx = generateTransaction();
-    tx.timestamp = new Date(Date.now() - (count - i) * 3600000);
-    txs.push(tx);
+  const transactions: Transaction[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const transaction = generateTransaction();
+    transaction.timestamp = new Date(Date.now() - (count - index) * 60 * 60 * 1000);
+    transactions.push(transaction);
   }
-  return txs;
+  return transactions;
+}
+
+function createSeedState(): PersistedAppState {
+  return {
+    wallet: INITIAL_WALLET,
+    transactions: generateInitialTransactions(20),
+    rules: DEFAULT_RULES,
+    portfolio: MOCK_PORTFOLIO,
+    notifications: [
+      {
+        id: 'seed-note-1',
+        message: 'Weekend Food Control moved ₹50 into Gold ETF.',
+        type: 'success',
+        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+      },
+      {
+        id: 'seed-note-2',
+        message: 'Smart Round-Up routed ₹8 into Wallet.',
+        type: 'info',
+        timestamp: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
+      },
+    ],
+    destinationBalances: DEFAULT_DESTINATION_BALANCES,
+    recentExecutions: DEFAULT_RULE_EXECUTIONS,
+    lastInvestment: null,
+    groups: INITIAL_GROUPS,
+    groupContributions: INITIAL_CONTRIBUTIONS,
+  };
+}
+
+function reviveTransaction(transaction: Transaction & { timestamp: string | Date }): Transaction {
+  return {
+    ...transaction,
+    timestamp: transaction.timestamp instanceof Date ? transaction.timestamp : new Date(transaction.timestamp),
+    ruleExecutions: (transaction as any).ruleExecutions ?? [],
+  };
+}
+
+function loadPersistedState(): PersistedAppState {
+  if (typeof window === 'undefined') return createSeedState();
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    if (!stored) return createSeedState();
+    const parsed = JSON.parse(stored);
+    return {
+      ...createSeedState(),
+      ...parsed,
+      transactions: (parsed.transactions || []).map(reviveTransaction),
+      groups: parsed.groups || INITIAL_GROUPS,
+      groupContributions: (parsed.groupContributions || []).map((c: any) => ({ ...c, timestamp: new Date(c.timestamp) })),
+    };
+  } catch {
+    return createSeedState();
+  }
+}
+
+function sortRules(rules: Rule[]): Rule[] {
+  return [...rules].sort((left, right) => {
+    if (left.enabled !== right.enabled) return left.enabled ? -1 : 1;
+    return new Date(right.updatedAt || 0).getTime() - new Date(left.updatedAt || 0).getTime();
+  });
+}
+
+function incrementDestination(balances: Record<RuleDestination, number>, destination: RuleDestination, amount: number) {
+  balances[destination] = (balances[destination] ?? 0) + amount;
+}
+
+function addAmountToPortfolio(portfolio: Investment[], destination: RuleDestination, amount: number): Investment[] {
+  const portfolioTypeMap: Partial<Record<RuleDestination, Investment['type']>> = {
+    'Gold ETF': 'Gold ETF',
+    'Index Fund': 'Index Fund',
+    'Debt Fund': 'Debt Fund',
+  };
+  const targetType = portfolioTypeMap[destination];
+  if (!targetType) return portfolio;
+  return portfolio.map((holding) =>
+    holding.type === targetType ? { ...holding, amount: holding.amount + amount } : holding
+  );
+}
+
+function hasMatchingRule(rules: Rule[], predicate: (rule: Rule) => boolean) {
+  return rules.some(predicate);
+}
+
+function buildSuggestedRules(transactions: Transaction[], rules: Rule[]): SuggestedRule[] {
+  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const recentTransactions = transactions.filter((transaction) => transaction.timestamp.getTime() >= weekAgo);
+  const foodSpend = recentTransactions.filter((t) => t.category === 'Food').reduce((sum, t) => sum + t.amount, 0);
+  const shoppingSpend = recentTransactions.filter((t) => t.category === 'Shopping').reduce((sum, t) => sum + t.amount, 0);
+  const transportSpend = recentTransactions.filter((t) => t.category === 'Transport').reduce((sum, t) => sum + t.amount, 0);
+  const suggestions: SuggestedRule[] = [];
+
+  if (foodSpend >= 1200 && !hasMatchingRule(rules, (r) => r.enabled && r.conditions?.some((c) => c.field === 'category' && c.value === 'Food'))) {
+    suggestions.push({
+      id: 'suggested-food',
+      title: 'Food Control Rule',
+      description: `You spend ${formatCurrency(foodSpend)}/week on food.`,
+      insight: 'Create a friction layer for weekend food splurges and redirect small amounts into Gold ETF.',
+      estimatedMonthlySavings: 800,
+      template: createRuleDefinition({
+        name: 'Food Control Rule',
+        mode: 'advanced',
+        logic: 'AND',
+        conditions: [
+          { id: 'suggested-food-1', field: 'category', operator: 'equals', value: 'Food' },
+          { id: 'suggested-food-2', field: 'amount', operator: 'greater_than', value: 300 },
+        ],
+        action: { type: 'fixed_invest', value: 50 },
+        destination: 'Gold ETF',
+      }),
+    });
+  }
+  return suggestions.slice(0, 3);
 }
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [wallet, setWallet] = useState<WalletState>(INITIAL_WALLET);
-  const [transactions, setTransactions] = useState<Transaction[]>(() => generateInitialTransactions(20));
-  const [rules, setRules] = useState<Rule[]>(DEFAULT_RULES);
-  const [portfolio] = useState<Investment[]>(MOCK_PORTFOLIO);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [groups, setGroups] = useState<Group[]>(INITIAL_GROUPS);
-  const [groupContributions, setGroupContributions] = useState<GroupContribution[]>(INITIAL_CONTRIBUTIONS);
+  const [state, setState] = useState<PersistedAppState>(() => loadPersistedState());
   const [isStreaming, setIsStreaming] = useState(false);
-  const [lastInvestment, setLastInvestment] = useState<{ amount: number; timestamp: Date; ruleName: string } | null>(null);
+  const [highlightedRuleIds, setHighlightedRuleIds] = useState<string[]>([]);
   const streamRef = useRef<ReturnType<typeof setInterval>>();
+  const flashTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const stateRef = useRef(state);
 
-  const addNotification = useCallback((message: string, type: Notification['type'] = 'info') => {
-    setNotifications(prev => [{
-      id: `n-${Date.now()}`,
-      message,
-      type,
-      timestamp: new Date(),
-    }, ...prev].slice(0, 20));
+  useEffect(() => {
+    stateRef.current = state;
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+  }, [state]);
+
+  const addNotification = useCallback((message: string, type: 'info' | 'success' | 'warning') => {
+    const id = Math.random().toString(36).substring(7);
+    setState(prev => ({
+      ...prev,
+      notifications: [{ id, message, type, timestamp: new Date().toISOString() }, ...prev.notifications].slice(0, 20)
+    }));
   }, []);
-
-  // Calculate automation impact (total saved via rules)
-  const automationImpact = useMemo(() => {
-    return rules.reduce((acc, rule) => {
-      let ruleValue = 0;
-      if (rule.action.type === 'fixed') ruleValue = (rule.action.value || 0) * rule.triggerCount;
-      if (rule.action.type === 'round-up') ruleValue = 5 * rule.triggerCount; // Estimated 5 per round up
-      return acc + ruleValue;
-    }, 0);
-  }, [rules]);
 
   const simulateTransaction = useCallback(() => {
-    const tx = generateTransaction();
-    setTransactions(prev => [tx, ...prev]);
+    const current = stateRef.current;
+    const transaction = generateTransaction();
+    let nextWallet = current.wallet;
+    let nextPortfolio = current.portfolio;
+    const nextDestinationBalances = { ...current.destinationBalances };
+    const triggeredRuleIds: string[] = [];
+    const ruleExecutions: RuleExecution[] = [];
 
-    let totalSavedInTx = 0;
-    let triggeredRuleName = '';
-
-    // Process Rules
-    setRules(prevRules => prevRules.map(rule => {
-      if (!rule.enabled) return rule;
-      
-      const isTriggered = evaluateCondition(tx, rule.condition);
-      if (isTriggered) {
-        let savedAmount = 0;
-        if (rule.action.type === 'round-up') {
-          savedAmount = tx.roundUp;
-        } else if (rule.action.type === 'fixed') {
-          savedAmount = rule.action.value || 0;
-        } else if (rule.action.type === 'percent') {
-          savedAmount = Math.round(tx.amount * (rule.action.value || 0) / 100);
+    const nextRules = current.rules.map((rule) => {
+      if (!doesRuleMatch(transaction, rule)) return rule;
+      const execution = createRuleExecution(transaction, rule);
+      triggeredRuleIds.push(rule.id);
+      ruleExecutions.push(execution);
+      incrementDestination(nextDestinationBalances, rule.destination, execution.amount);
+      if (rule.destination === 'Wallet') {
+        nextWallet = addToWallet(nextWallet, execution.amount);
+      } else {
+        nextWallet = { ...nextWallet, totalSaved: nextWallet.totalSaved + execution.amount };
+        if (rule.destination === 'Gold ETF' || rule.destination === 'Index Fund' || rule.destination === 'Debt Fund') {
+          nextWallet = { ...nextWallet, totalInvested: nextWallet.totalInvested + execution.amount };
+          nextPortfolio = addAmountToPortfolio(nextPortfolio, rule.destination, execution.amount);
         }
-
-        totalSavedInTx += savedAmount;
-        triggeredRuleName = rule.name;
-        
-        return { 
-          ...rule, 
-          triggerCount: rule.triggerCount + 1,
-          lastTriggered: new Date().toISOString()
-        };
       }
-      return rule;
-    }));
-
-    if (totalSavedInTx > 0) {
-      setWallet(prev => ({
-        ...prev,
-        balance: prev.balance + totalSavedInTx,
-        totalSaved: prev.totalSaved + totalSavedInTx,
-      }));
-      
-      setLastInvestment({ 
-        amount: totalSavedInTx, 
-        timestamp: new Date(), 
-        ruleName: triggeredRuleName 
-      });
-
-      addNotification(`Rule "${triggeredRuleName}" triggered: +₹${totalSavedInTx}`, 'success');
-      
-      // Auto-invest if threshold reached
-      setWallet(currentWallet => {
-        const result = triggerInvestment(currentWallet);
-        if (result.invested) {
-          addNotification(`🎉 Wallet threshold reached! ₹${result.amount} auto-invested`, 'success');
-          return result.wallet;
-        }
-        return currentWallet;
-      });
-    }
-
-    return tx;
-  }, [addNotification]);
-
-  const addRule = useCallback((rule: Omit<Rule, 'id' | 'triggerCount'>) => {
-    const newRule: Rule = {
-      ...rule,
-      id: `r-${Date.now()}`,
-      triggerCount: 0,
-    };
-    setRules(prev => [...prev, newRule]);
-    addNotification(`Rule "${newRule.name}" created successfully`, 'success');
-  }, [addNotification]);
-
-  const updateRule = useCallback((id: string, updates: Partial<Rule>) => {
-    setRules(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
-    addNotification('Rule updated successfully', 'success');
-  }, [addNotification]);
-
-  const deleteRule = useCallback((id: string) => {
-    setRules(prev => prev.filter(r => r.id !== id));
-    addNotification('Rule deleted', 'warning');
-  }, [addNotification]);
-
-  const duplicateRule = useCallback((id: string) => {
-    const ruleToDup = rules.find(r => r.id === id);
-    if (ruleToDup) {
-      const newRule: Rule = {
-        ...ruleToDup,
-        id: `r-${Date.now()}`,
-        name: `${ruleToDup.name} (Copy)`,
-        triggerCount: 0,
+      return {
+        ...rule,
+        triggerCount: rule.triggerCount + 1,
+        lastTriggeredAt: execution.executedAt,
+        totalExecutedAmount: rule.totalExecutedAmount + execution.amount,
+        monthlyExecutedAmount: rule.monthlyExecutedAmount + execution.amount,
+        updatedAt: execution.executedAt,
       };
-      setRules(prev => [...prev, newRule]);
-      addNotification(`Duplicated "${ruleToDup.name}"`, 'success');
+    });
+
+    const thresholdResult = triggerInvestment(nextWallet);
+    let lastInvestment = current.lastInvestment;
+    if (thresholdResult.invested) {
+      nextWallet = thresholdResult.wallet;
+      nextPortfolio = addAmountToPortfolio(nextPortfolio, 'Index Fund', thresholdResult.amount);
+      lastInvestment = { amount: thresholdResult.amount, timestamp: new Date().toISOString() };
     }
-  }, [rules, addNotification]);
 
-  const toggleRule = useCallback((id: string) => {
-    setRules(prev => prev.map(r => r.id === id ? { ...r, enabled: !r.enabled } : r));
-  }, []);
-
-  const clearNotification = useCallback((id: string) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
+    setState(prev => ({
+      ...prev,
+      wallet: nextWallet,
+      portfolio: nextPortfolio,
+      rules: sortRules(nextRules),
+      transactions: [transaction, ...prev.transactions].slice(0, 60),
+      destinationBalances: nextDestinationBalances,
+      recentExecutions: [...ruleExecutions, ...prev.recentExecutions].slice(0, 12),
+      lastInvestment,
+    }));
+    setHighlightedRuleIds(triggeredRuleIds);
+    clearTimeout(flashTimeoutRef.current);
+    flashTimeoutRef.current = setTimeout(() => setHighlightedRuleIds([]), 1800);
+    return transaction;
   }, []);
 
   const createGroup = useCallback((groupData: Omit<Group, 'id' | 'totalSaved' | 'members' | 'inviteCode' | 'createdAt'>) => {
@@ -250,11 +343,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       totalSaved: 0,
       inviteCode: Math.random().toString(36).substring(2, 8).toUpperCase(),
       createdAt: new Date().toISOString(),
+      energyScore: 50,
+      urgencyStatus: 'On track',
+      trendData: [0, 0, 0, 0, 0, 0, 0],
       members: [
-        { userId: 'u1', name: 'Arjun', totalContributed: 0, lastActive: new Date().toISOString(), badges: [] }
+        { userId: 'u1', name: 'Arjun', totalContributed: 0, contributionShare: 100, lastActive: new Date().toISOString(), badges: [] }
       ]
     };
-    setGroups(prev => [newGroup, ...prev]);
+    setState(prev => ({ ...prev, groups: [newGroup, ...prev.groups] }));
     addNotification(`Group "${newGroup.name}" created!`, 'success');
   }, [addNotification]);
 
@@ -268,90 +364,122 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       source,
       timestamp: new Date()
     };
-    setGroupContributions(prev => [contribution, ...prev].slice(0, 50));
-    setGroups(prev => prev.map(g => {
-      if (g.id === groupId) {
-        return {
-          ...g,
-          totalSaved: g.totalSaved + amount,
-          members: g.members.map(m => m.userId === 'u1' ? { ...m, totalContributed: m.totalContributed + amount, lastActive: new Date().toISOString() } : m)
-        };
-      }
-      return g;
+    setState(prev => ({
+      ...prev,
+      groupContributions: [contribution, ...prev.groupContributions].slice(0, 50),
+      groups: prev.groups.map(g => {
+        if (g.id === groupId) {
+          const newTotal = g.totalSaved + amount;
+          return {
+            ...g,
+            totalSaved: newTotal,
+            members: g.members.map(m => m.userId === 'u1' ? { 
+              ...m, 
+              totalContributed: m.totalContributed + amount, 
+              lastActive: new Date().toISOString(),
+              contributionShare: Math.round(((m.totalContributed + amount) / newTotal) * 100)
+            } : m)
+          };
+        }
+        return g;
+      })
     }));
   }, []);
 
-  // Streaming mode
+  // Simulation Effects
   useEffect(() => {
     if (isStreaming) {
-      streamRef.current = setInterval(() => {
-        simulateTransaction();
-      }, 3000);
+      streamRef.current = setInterval(() => simulateTransaction(), 3000);
     } else {
       clearInterval(streamRef.current);
     }
     return () => clearInterval(streamRef.current);
   }, [isStreaming, simulateTransaction]);
 
-  // Group Simulation logic
   useEffect(() => {
     const interval = setInterval(() => {
-      const luckyGroup = groups[Math.floor(Math.random() * groups.length)];
+      const luckyGroup = state.groups[Math.floor(Math.random() * state.groups.length)];
       if (!luckyGroup) return;
-      
       const luckyMember = luckyGroup.members[Math.floor(Math.random() * luckyGroup.members.length)];
       if (!luckyMember) return;
-      
       const amount = Math.floor(Math.random() * 50) + 10;
       
-      setGroups(prev => prev.map(g => {
-        if (g.id === luckyGroup.id) {
-          return {
-            ...g,
-            totalSaved: g.totalSaved + amount,
-            lastActivity: {
-              userName: luckyMember.name,
-              amount,
-              timestamp: new Date()
-            },
-            energyScore: Math.min(100, g.energyScore + 2),
-            members: g.members.map(m => m.userId === luckyMember.userId ? {
-              ...m,
-              totalContributed: m.totalContributed + amount,
-              lastActive: new Date().toISOString()
-            } : m)
-          };
-        }
-        return g;
+      setState(prev => ({
+        ...prev,
+        groups: prev.groups.map(g => {
+          if (g.id === luckyGroup.id) {
+            const newTotal = g.totalSaved + amount;
+            return {
+              ...g,
+              totalSaved: newTotal,
+              lastActivity: { userName: luckyMember.name, amount, timestamp: new Date() },
+              energyScore: Math.min(100, g.energyScore + 2),
+              members: g.members.map(m => m.userId === luckyMember.userId ? {
+                ...m,
+                totalContributed: m.totalContributed + amount,
+                lastActive: new Date().toISOString(),
+                contributionShare: Math.round(((m.totalContributed + amount) / newTotal) * 100)
+              } : m)
+            };
+          }
+          return g;
+        })
       }));
-    }, 8000); // Simulate every 8s
-
+    }, 8000);
     return () => clearInterval(interval);
-  }, [groups]);
+  }, [state.groups.length]);
 
-  const weeklySpare = transactions
-    .filter(t => t.timestamp > new Date(Date.now() - 7 * 86400000))
-    .reduce((sum, t) => sum + t.roundUp, 0);
-
-  const growthPercent = wallet.totalInvested > 0
-    ? Math.round((portfolio.reduce((s, p) => s + p.amount * p.returns / 100, 0) / wallet.totalInvested) * 100) / 10
-    : 0;
-
-  return (
-    <AppContext.Provider value={{
-      wallet, transactions, rules, portfolio, notifications,
-      weeklySpare, growthPercent, isStreaming, setIsStreaming,
-      simulateTransaction, toggleRule, clearNotification, lastInvestment,
-      addRule, updateRule, deleteRule, duplicateRule, automationImpact,
-      groups, groupContributions, createGroup, addContributionToGroup
-    }}>
-      {children}
-    </AppContext.Provider>
+  const weeklySpare = useMemo(() => 
+    state.transactions.filter(t => t.timestamp > new Date(Date.now() - 7 * 86400000)).reduce((sum, t) => sum + t.roundUp, 0),
+    [state.transactions]
   );
+
+  const growthPercent = useMemo(() => {
+    if (state.wallet.totalInvested <= 0) return 0;
+    const returns = state.portfolio.reduce((sum, inv) => sum + inv.amount * (inv.returns / 100), 0);
+    return Math.round((returns / state.wallet.totalInvested) * 1000) / 10;
+  }, [state.portfolio, state.wallet.totalInvested]);
+
+  const automationStats = useMemo<AutomationStats>(() => {
+    const enabledRules = state.rules.filter(r => r.enabled);
+    const projected = enabledRules.reduce((sum, r) => sum + r.monthlyExecutedAmount, 0);
+    return {
+      thisMonthSaved: projected,
+      inactiveOpportunity: 0,
+      projectedMonthlyContribution: projected,
+      activeRules: enabledRules.length,
+      totalTriggers: state.rules.reduce((sum, r) => sum + r.triggerCount, 0),
+      totalRouted: Object.values(state.destinationBalances).reduce((sum, amt) => sum + amt, 0),
+      topDestination: 'Wallet' as RuleDestination
+    };
+  }, [state.rules, state.destinationBalances]);
+
+  const value = useMemo<AppContextType>(() => ({
+    ...state,
+    weeklySpare,
+    growthPercent,
+    automationStats,
+    suggestedRules: buildSuggestedRules(state.transactions, state.rules),
+    highlightedRuleIds,
+    isStreaming,
+    setIsStreaming,
+    automationImpact: 85,
+    simulateTransaction,
+    toggleRule: (id) => setState(prev => ({ ...prev, rules: prev.rules.map(r => r.id === id ? { ...r, enabled: !r.enabled, updatedAt: new Date().toISOString() } : r) })),
+    createRule: (rule) => setState(prev => ({ ...prev, rules: sortRules([{ ...rule, updatedAt: new Date().toISOString() }, ...prev.rules]) })),
+    updateRule: (rule) => setState(prev => ({ ...prev, rules: sortRules(prev.rules.map(r => r.id === rule.id ? { ...rule, updatedAt: new Date().toISOString() } : r)) })),
+    deleteRule: (id) => setState(prev => ({ ...prev, rules: prev.rules.filter(r => r.id !== id) })),
+    clearNotification: (id) => setState(prev => ({ ...prev, notifications: prev.notifications.filter(n => n.id !== id) })),
+    createGroup,
+    addContributionToGroup,
+    addNotification
+  }), [state, weeklySpare, growthPercent, automationStats, highlightedRuleIds, isStreaming, simulateTransaction, createGroup, addContributionToGroup, addNotification]);
+
+  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
 
 export function useApp() {
-  const ctx = useContext(AppContext);
-  if (!ctx) throw new Error('useApp must be used within AppProvider');
-  return ctx;
+  const context = useContext(AppContext);
+  if (!context) throw new Error('useApp must be used within AppProvider');
+  return context;
 }

@@ -254,7 +254,12 @@ function GroupCard({ group }: { group: Group }) {
               <div className="grid grid-cols-2 gap-2">
                 <Button 
                   variant="outline" 
-                  onClick={(e) => { e.stopPropagation(); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const inviteLink = `${window.location.origin}/dashboard/groups/${group.id}?invite=${group.inviteCode}`;
+                    navigator.clipboard.writeText(inviteLink);
+                    toast.success('Invite link copied!');
+                  }}
                   className="rounded-xl font-bold bg-background text-xs"
                 >
                   <Copy className="w-3.5 h-3.5 mr-2" /> Invite
@@ -571,7 +576,7 @@ export default function UserGroups() {
                     <p className="text-sm text-muted-foreground">Share the link with your squad</p>
                   </div>
 
-                  <div className="space-y-6">
+                  <div className="space-y-6" key="invite-details">
                     <div className="bg-muted/50 border border-border/50 p-6 rounded-3xl relative overflow-hidden text-center">
                       <div className="relative z-10 space-y-3">
                         <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-2">
@@ -579,17 +584,13 @@ export default function UserGroups() {
                         </div>
                         <p className="text-xs font-medium text-muted-foreground">Your Invite Link</p>
                         <div className="bg-background rounded-xl p-3 border border-border flex items-center justify-between animate-shimmer overflow-hidden">
-                          <a 
-                            href={`/dashboard/groups/${groups[0]?.id || 'new'}`}
-                            onClick={(e) => { e.preventDefault(); navigate(`/dashboard/groups/${groups[0]?.id || 'new'}`); }}
-                            className="text-[10px] text-primary font-mono truncate mr-2 hover:underline cursor-pointer"
-                          >
+                          <div className="text-[10px] text-primary font-mono truncate mr-2">
                             {window.location.origin.replace(/^https?:\/\//, '')}/invite/{formData.name.toLowerCase().replace(/\s+/g, '-') || 'new-group'}
-                          </a>
+                          </div>
                           <button 
                             className="shrink-0 bg-primary/10 p-2 rounded-lg text-primary hover:bg-primary hover:text-white transition-colors"
                             onClick={() => {
-                              const inviteLink = `${window.location.origin}/dashboard/groups/${groups[0]?.id || 'new'}?invite=${formData.name.toLowerCase().replace(/\s+/g, '-') || 'new-group'}`;
+                              const inviteLink = `${window.location.origin}/dashboard/groups/new?invite=${formData.name.toLowerCase().replace(/\s+/g, '-') || 'new-group'}`;
                               navigator.clipboard.writeText(inviteLink);
                               toast.success('Link copied!');
                             }}
