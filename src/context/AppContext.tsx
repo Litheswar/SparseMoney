@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
-import { Transaction, WalletState, Rule, generateTransaction, addToWallet, triggerInvestment, calculateRoundUp, DEFAULT_RULES, MOCK_PORTFOLIO, Investment } from '@/lib/engine';
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { Transaction, WalletState, Rule, generateTransaction, addToWallet, triggerInvestment, calculateRoundUp, DEFAULT_RULES, MOCK_PORTFOLIO, Investment, evaluateCondition } from '@/lib/engine';
 
 interface Notification {
   id: string;
@@ -20,11 +20,16 @@ interface AppState {
 
 interface AppContextType extends AppState {
   simulateTransaction: () => Transaction;
+  addRule: (rule: Omit<Rule, 'id' | 'triggerCount'>) => void;
+  updateRule: (id: string, updates: Partial<Rule>) => void;
+  deleteRule: (id: string) => void;
+  duplicateRule: (id: string) => void;
   toggleRule: (id: string) => void;
   clearNotification: (id: string) => void;
   isStreaming: boolean;
   setIsStreaming: (v: boolean) => void;
-  lastInvestment: { amount: number; timestamp: Date } | null;
+  lastInvestment: { amount: number; timestamp: Date; ruleName: string } | null;
+  automationImpact: number;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -54,7 +59,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [portfolio] = useState<Investment[]>(MOCK_PORTFOLIO);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
-  const [lastInvestment, setLastInvestment] = useState<{ amount: number; timestamp: Date } | null>(null);
+  const [lastInvestment, setLastInvestment] = useState<{ amount: number; timestamp: Date; ruleName: string } | null>(null);
   const streamRef = useRef<ReturnType<typeof setInterval>>();
 
   const addNotification = useCallback((message: string, type: Notification['type'] = 'info') => {
@@ -66,25 +71,112 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }, ...prev].slice(0, 20));
   }, []);
 
+  // Calculate automation impact (total saved via rules)
+  const automationImpact = useMemo(() => {
+    return rules.reduce((acc, rule) => {
+      let ruleValue = 0;
+      if (rule.action.type === 'fixed') ruleValue = (rule.action.value || 0) * rule.triggerCount;
+      if (rule.action.type === 'round-up') ruleValue = 5 * rule.triggerCount; // Estimated 5 per round up
+      return acc + ruleValue;
+    }, 0);
+  }, [rules]);
+
   const simulateTransaction = useCallback(() => {
     const tx = generateTransaction();
     setTransactions(prev => [tx, ...prev]);
 
-    // Round up to wallet
-    const newWallet = addToWallet(wallet, tx.roundUp);
-    setWallet(newWallet);
-    addNotification(`+₹${tx.roundUp} spare from ${tx.merchant}`, 'success');
+    let totalSavedInTx = 0;
+    let triggeredRuleName = '';
 
-    // Check threshold
-    const result = triggerInvestment(newWallet);
-    if (result.invested) {
-      setWallet(result.wallet);
-      setLastInvestment({ amount: result.amount, timestamp: new Date() });
-      addNotification(`🎉 ₹${result.amount} auto-invested!`, 'success');
+    // Process Rules
+    setRules(prevRules => prevRules.map(rule => {
+      if (!rule.enabled) return rule;
+      
+      const isTriggered = evaluateCondition(tx, rule.condition);
+      if (isTriggered) {
+        let savedAmount = 0;
+        if (rule.action.type === 'round-up') {
+          savedAmount = tx.roundUp;
+        } else if (rule.action.type === 'fixed') {
+          savedAmount = rule.action.value || 0;
+        } else if (rule.action.type === 'percent') {
+          savedAmount = Math.round(tx.amount * (rule.action.value || 0) / 100);
+        }
+
+        totalSavedInTx += savedAmount;
+        triggeredRuleName = rule.name;
+        
+        return { 
+          ...rule, 
+          triggerCount: rule.triggerCount + 1,
+          lastTriggered: new Date().toISOString()
+        };
+      }
+      return rule;
+    }));
+
+    if (totalSavedInTx > 0) {
+      setWallet(prev => ({
+        ...prev,
+        balance: prev.balance + totalSavedInTx,
+        totalSaved: prev.totalSaved + totalSavedInTx,
+      }));
+      
+      setLastInvestment({ 
+        amount: totalSavedInTx, 
+        timestamp: new Date(), 
+        ruleName: triggeredRuleName 
+      });
+
+      addNotification(`Rule "${triggeredRuleName}" triggered: +₹${totalSavedInTx}`, 'success');
+      
+      // Auto-invest if threshold reached
+      setWallet(currentWallet => {
+        const result = triggerInvestment(currentWallet);
+        if (result.invested) {
+          addNotification(`🎉 Wallet threshold reached! ₹${result.amount} auto-invested`, 'success');
+          return result.wallet;
+        }
+        return currentWallet;
+      });
     }
 
     return tx;
-  }, [wallet, addNotification]);
+  }, [addNotification]);
+
+  const addRule = useCallback((rule: Omit<Rule, 'id' | 'triggerCount'>) => {
+    const newRule: Rule = {
+      ...rule,
+      id: `r-${Date.now()}`,
+      triggerCount: 0,
+    };
+    setRules(prev => [...prev, newRule]);
+    addNotification(`Rule "${newRule.name}" created successfully`, 'success');
+  }, [addNotification]);
+
+  const updateRule = useCallback((id: string, updates: Partial<Rule>) => {
+    setRules(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
+    addNotification('Rule updated successfully', 'success');
+  }, [addNotification]);
+
+  const deleteRule = useCallback((id: string) => {
+    setRules(prev => prev.filter(r => r.id !== id));
+    addNotification('Rule deleted', 'warning');
+  }, [addNotification]);
+
+  const duplicateRule = useCallback((id: string) => {
+    const ruleToDup = rules.find(r => r.id === id);
+    if (ruleToDup) {
+      const newRule: Rule = {
+        ...ruleToDup,
+        id: `r-${Date.now()}`,
+        name: `${ruleToDup.name} (Copy)`,
+        triggerCount: 0,
+      };
+      setRules(prev => [...prev, newRule]);
+      addNotification(`Duplicated "${ruleToDup.name}"`, 'success');
+    }
+  }, [rules, addNotification]);
 
   const toggleRule = useCallback((id: string) => {
     setRules(prev => prev.map(r => r.id === id ? { ...r, enabled: !r.enabled } : r));
@@ -119,6 +211,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       wallet, transactions, rules, portfolio, notifications,
       weeklySpare, growthPercent, isStreaming, setIsStreaming,
       simulateTransaction, toggleRule, clearNotification, lastInvestment,
+      addRule, updateRule, deleteRule, duplicateRule, automationImpact
     }}>
       {children}
     </AppContext.Provider>

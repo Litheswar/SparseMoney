@@ -37,14 +37,36 @@ export function triggerInvestment(wallet: WalletState): { wallet: WalletState; i
 }
 
 // === RULE ENGINE ===
+export type RuleConditionType = 'all' | 'category' | 'amount' | 'day' | 'merchant';
+export type RuleOperator = '>' | '<' | '==' | 'contains';
+export type RuleLogic = 'AND' | 'OR';
+
+export interface RuleCondition {
+  type: RuleConditionType;
+  operator?: RuleOperator;
+  value?: string | number;
+  logic?: RuleLogic;
+  subConditions?: RuleCondition[];
+}
+
+export interface RuleAction {
+  type: 'round-up' | 'fixed' | 'percent' | 'auto-sweep' | 'goal' | 'group';
+  value?: number;
+  destination?: {
+    type: 'Gold ETF' | 'Index Fund' | 'Debt Fund' | 'Wallet' | 'Goal' | 'Group';
+    name: string;
+  };
+}
+
 export interface Rule {
   id: string;
   name: string;
-  condition: string;
-  action: string;
+  condition: RuleCondition;
+  action: RuleAction;
   enabled: boolean;
-  category: 'round-up' | 'guilt-tax' | 'overspend' | 'custom';
+  category: 'round-up' | 'guilt-tax' | 'overspend' | 'custom' | 'suggestion';
   triggerCount: number;
+  lastTriggered?: string;
 }
 
 export interface Transaction {
@@ -55,6 +77,40 @@ export interface Transaction {
   roundUp: number;
   timestamp: Date;
   icon: string;
+}
+
+// Logic Helper: Evaluate if a transaction triggers a rule
+export function evaluateCondition(tx: Transaction, cond: RuleCondition): boolean {
+  if (cond.type === 'all') return true;
+  
+  let match = false;
+  switch (cond.type) {
+    case 'category':
+      match = tx.category.toLowerCase() === (cond.value as string).toLowerCase();
+      break;
+    case 'amount':
+      if (cond.operator === '>') match = tx.amount > (cond.value as number);
+      else if (cond.operator === '<') match = tx.amount < (cond.value as number);
+      else match = tx.amount === (cond.value as number);
+      break;
+    case 'day':
+      const isWeekend = [0, 6].includes(new Date(tx.timestamp).getDay());
+      match = cond.value === 'weekend' ? isWeekend : !isWeekend;
+      break;
+    case 'merchant':
+      match = tx.merchant.toLowerCase().includes((cond.value as string).toLowerCase());
+      break;
+  }
+
+  if (cond.subConditions && cond.subConditions.length > 0) {
+    const subMatches = cond.subConditions.map(c => evaluateCondition(tx, c));
+    if (cond.logic === 'OR') {
+      return match || subMatches.some(m => m);
+    }
+    return match && subMatches.every(m => m);
+  }
+
+  return match;
 }
 
 // === TRANSACTION SIMULATOR ===
@@ -139,8 +195,31 @@ export function predictGrowth(
 }
 
 export const DEFAULT_RULES: Rule[] = [
-  { id: 'r1', name: 'Smart Round-Up', condition: 'Every transaction', action: 'Round up to nearest ₹10', enabled: true, category: 'round-up', triggerCount: 142 },
-  { id: 'r2', name: 'Food Guilt Tax', condition: 'Food spend > ₹300', action: 'Invest ₹50 in Gold ETF', enabled: true, category: 'guilt-tax', triggerCount: 28 },
-  { id: 'r3', name: 'Weekend Spender', condition: 'Weekend shopping > ₹500', action: 'Invest ₹100 in Index Fund', enabled: false, category: 'overspend', triggerCount: 12 },
-  { id: 'r4', name: 'Spare Overflow', condition: 'Spare > ₹25', action: 'Invest in Gold ETF', enabled: true, category: 'custom', triggerCount: 67 },
+  { 
+    id: 'r1', 
+    name: 'Smart Round-Up', 
+    condition: { type: 'all' }, 
+    action: { type: 'round-up', destination: { type: 'Wallet', name: 'Spare Wallet' } }, 
+    enabled: true, 
+    category: 'round-up', 
+    triggerCount: 142 
+  },
+  { 
+    id: 'r2', 
+    name: 'Food Guilt Tax', 
+    condition: { type: 'category', value: 'Food' }, 
+    action: { type: 'fixed', value: 50, destination: { type: 'Gold ETF', name: 'Nippon Gold ETF' } }, 
+    enabled: true, 
+    category: 'guilt-tax', 
+    triggerCount: 28 
+  },
+  { 
+    id: 'r3', 
+    name: 'Weekend Overspender', 
+    condition: { type: 'day', value: 'weekend' }, 
+    action: { type: 'percent', value: 10, destination: { type: 'Index Fund', name: 'Nifty 50 Index' } }, 
+    enabled: false, 
+    category: 'overspend', 
+    triggerCount: 12 
+  },
 ];
