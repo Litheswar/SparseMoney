@@ -3,6 +3,7 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
 @layer base {
   :root {
     --background: 180 10% 98%;
@@ -80,9 +81,7 @@
     --input: 200 20% 16%;
     --ring: 174 62% 50%;
   }
-}
 
-@layer base {
   * {
     @apply border-border;
   }
@@ -161,56 +160,43 @@
     0% { opacity: 0; transform: translateY(-20px) scale(0.5); }
     60% { opacity: 1; transform: translateY(5px) scale(1.1); }
     100% { opacity: 1; transform: translateY(0) scale(1); }
-  }
-  @keyframes pulse-glow {
-    0%, 100% { box-shadow: 0 0 0 0 hsl(174 62% 40% / 0.4); }
-    50% { box-shadow: 0 0 0 10px hsl(174 62% 40% / 0); }
-  }
-  @keyframes shimmer {
-    0% { background-position: -200% 0; }
-    100% { background-position: 200% 0; }
-  }
-  @keyframes check-draw {
-    0% { stroke-dashoffset: 24; }
-    100% { stroke-dashoffset: 0; }
-  }
-  @keyframes fade-in {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  .animate-count-up { animation: count-up 0.5s ease-out forwards; }
-  .animate-slide-in-up { animation: slide-in-up 0.4s ease-out forwards; }
-  .animate-coin-drop { animation: coin-drop 0.6s ease-out forwards; }
-  .animate-pulse-glow { animation: pulse-glow 2s infinite; }
-  .animate-shimmer {
-    background: linear-gradient(90deg, transparent, hsl(174 62% 40% / 0.1), transparent);
-    background-size: 200% 100%;
-    animation: shimmer 2s infinite;
-  }
-  .animate-check-draw { animation: check-draw 0.4s ease-out forwards; }
-  .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
-  .animate-breathing-glow {
-    animation: breathing-shadow 3s ease-in-out infinite;
-  }
-
-  /* Status Colors & Glows */
-  .shadow-success-glow {
-    box-shadow: 0 0 15px -3px hsl(var(--success) / 0.3);
-  }
-  .shadow-warning-glow {
-    box-shadow: 0 0 15px -3px hsl(var(--warning) / 0.3);
-  }
-  .shadow-risk-glow {
-    box-shadow: 0 0 15px -3px hsl(var(--risk) / 0.3);
-  }
-
-  @keyframes breathing-shadow {
-    0%, 100% { opacity: 0.6; transform: scale(1); }
-    50% { opacity: 1; transform: scale(1.05); }
-  }
 }
 
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
+@keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 0 0 hsl(174 62% 40% / 0.4); }
+    50% { box-shadow: 0 0 0 10px hsl(174 62% 40% / 0); }
+}
+
+@keyframes check-draw {
+    0% { stroke-dashoffset: 24; }
+    100% { stroke-dashoffset: 0; }
+}
+
+@keyframes fade-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-pulse-glow { animation: pulse-glow 2s infinite; }
+.animate-check-draw { animation: check-draw 0.4s ease-out forwards; }
+.animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
+
+.animate-breathing-glow {
+    animation: breathing-shadow 3s ease-in-out infinite;
+}
+
+/* Status Colors & Glows */
+.shadow-success-glow {
+    box-shadow: 0 0 15px -3px hsl(var(--success) / 0.3);
+}
+.shadow-warning-glow {
+    box-shadow: 0 0 15px -3px hsl(var(--warning) / 0.3);
+}
+.shadow-risk-glow {
+    box-shadow: 0 0 15px -3px hsl(var(--risk) / 0.3);
+}
+
+@keyframes breathing-shadow {
+    0%, 100% { opacity: 0.6; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.05); }
 }

@@ -1,10 +1,11 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { 
-  Transaction, WalletState, Rule, generateTransaction, addToWallet, 
-  triggerInvestment, calculateRoundUp, DEFAULT_RULES, MOCK_PORTFOLIO, 
-  Investment, evaluateCondition, Group, GroupMember, GroupContribution 
+  Group, GroupMember, GroupContribution 
 } from '@/lib/engine';
 import {
+  Transaction, WalletState, Rule, generateTransaction, addToWallet, 
+  triggerInvestment, calculateRoundUp, DEFAULT_RULES, MOCK_PORTFOLIO, 
+  Investment,
   createRuleDefinition,
   createRuleExecution,
   DEFAULT_DESTINATION_BALANCES,
@@ -65,7 +66,7 @@ interface AppContextType extends AppState {
   setIsStreaming: (value: boolean) => void;
   lastInvestment: { amount: number; timestamp: string } | null;
   automationImpact: number;
-  createGroup: (group: Omit<Group, 'id' | 'totalSaved' | 'members' | 'inviteCode' | 'createdAt'>) => void;
+  createGroup: (group: Omit<Group, 'id' | 'totalSaved' | 'members' | 'inviteCode' | 'createdAt' | 'energyScore' | 'urgencyStatus' | 'trendData'>) => void;
   addContributionToGroup: (groupId: string, amount: number, source: 'roundup' | 'manual') => void;
   addNotification: (message: string, type: 'info' | 'success' | 'warning') => void;
 }
@@ -170,11 +171,11 @@ function createSeedState(): PersistedAppState {
   };
 }
 
-function reviveTransaction(transaction: Transaction & { timestamp: string | Date }): Transaction {
+function reviveTransaction(transaction: any): Transaction {
   return {
     ...transaction,
     timestamp: transaction.timestamp instanceof Date ? transaction.timestamp : new Date(transaction.timestamp),
-    ruleExecutions: (transaction as any).ruleExecutions ?? [],
+    ruleExecutions: transaction.ruleExecutions ?? [],
   };
 }
 
@@ -336,7 +337,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return transaction;
   }, []);
 
-  const createGroup = useCallback((groupData: Omit<Group, 'id' | 'totalSaved' | 'members' | 'inviteCode' | 'createdAt'>) => {
+  const createGroup = useCallback((groupData: Omit<Group, 'id' | 'totalSaved' | 'members' | 'inviteCode' | 'createdAt' | 'energyScore' | 'urgencyStatus' | 'trendData'>) => {
     const newGroup: Group = {
       ...groupData,
       id: `g-${Date.now()}`,
