@@ -15,7 +15,7 @@ export interface User {
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => boolean;
+  login: (email: string, password: string, role?: UserRole) => boolean;
   logout: () => void;
   completeOnboarding: (bankName: string) => void;
   isAuthenticated: boolean;
@@ -47,9 +47,9 @@ const DEMO_USERS: Record<string, User & { password: string }> = {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
 
-  const login = useCallback((email: string, password: string) => {
+  const login = useCallback((email: string, password: string, role?: UserRole) => {
     const found = DEMO_USERS[email];
-    if (found && found.password === password) {
+    if (found && found.password === password && (!role || found.role === role)) {
       const { password: _, ...userData } = found;
       setUser(userData);
       return true;
