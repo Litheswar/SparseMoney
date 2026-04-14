@@ -20,10 +20,21 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 
 const BANKS = [
-  { id: 'sbi', name: 'State Bank of India', short: 'SBI', color: 'hsl(218 78% 46%)', mark: 'S' },
-  { id: 'hdfc', name: 'HDFC Bank', short: 'HDFC', color: 'hsl(355 78% 48%)', mark: 'H' },
-  { id: 'icici', name: 'ICICI Bank', short: 'ICICI', color: 'hsl(24 88% 50%)', mark: 'i' },
-  { id: 'axis', name: 'Axis Bank', short: 'AXIS', color: 'hsl(332 72% 38%)', mark: 'A' },
+  { id: 'sbi', name: 'State Bank of India', short: 'SBI', color: 'hsl(218 78% 46%)', mark: 'S', type: 'Public' },
+  { id: 'hdfc', name: 'HDFC Bank', short: 'HDFC', color: 'hsl(355 78% 48%)', mark: 'H', type: 'Private' },
+  { id: 'icici', name: 'ICICI Bank', short: 'ICICI', color: 'hsl(24 88% 50%)', mark: 'i', type: 'Private' },
+  { id: 'axis', name: 'Axis Bank', short: 'AXIS', color: 'hsl(332 72% 38%)', mark: 'A', type: 'Private' },
+  { id: 'pnb', name: 'Punjab National Bank', short: 'PNB', color: 'hsl(210 100% 35%)', mark: 'P', type: 'Public' },
+  { id: 'bob', name: 'Bank of Baroda', short: 'BOB', color: 'hsl(25 95% 53%)', mark: 'B', type: 'Public' },
+  { id: 'kotak', name: 'Kotak Mahindra Bank', short: 'KOTAK', color: 'hsl(350 83% 47%)', mark: 'K', type: 'Private' },
+  { id: 'canara', name: 'Canara Bank', short: 'CANARA', color: 'hsl(215 90% 40%)', mark: 'C', type: 'Public' },
+  { id: 'union', name: 'Union Bank of India', short: 'UNION', color: 'hsl(350 80% 45%)', mark: 'U', type: 'Public' },
+  { id: 'indusind', name: 'IndusInd Bank', short: 'INDUS', color: 'hsl(340 70% 35%)', mark: 'I', type: 'Private' },
+  { id: 'idbi', name: 'IDBI Bank', short: 'IDBI', color: 'hsl(160 80% 30%)', mark: 'I', type: 'Private' },
+  { id: 'boi', name: 'Bank of India', short: 'BOI', color: 'hsl(220 85% 45%)', mark: 'B', type: 'Public' },
+  { id: 'yes', name: 'Yes Bank', short: 'YES', color: 'hsl(220 70% 30%)', mark: 'Y', type: 'Private' },
+  { id: 'federal', name: 'Federal Bank', short: 'FEDERAL', color: 'hsl(215 80% 45%)', mark: 'F', type: 'Private' },
+  { id: 'indian', name: 'Indian Bank', short: 'INDIAN', color: 'hsl(225 75% 40%)', mark: 'I', type: 'Public' },
 ];
 
 const CONSENT_ITEMS = [
@@ -39,10 +50,10 @@ const PROCESSING_STEPS = [
   'Encrypting data',
 ];
 
-type Step = 'bank' | 'consent' | 'connecting' | 'success';
+type Step = 'bank' | 'phone' | 'consent' | 'connecting' | 'success';
 type PermissionKey = (typeof CONSENT_ITEMS)[number]['key'];
 
-const stepOrder: Step[] = ['bank', 'consent', 'connecting', 'success'];
+const stepOrder: Step[] = ['bank', 'phone', 'consent', 'connecting', 'success'];
 
 export default function OnboardingPage() {
   const { completeOnboarding } = useAuth();
@@ -55,9 +66,20 @@ export default function OnboardingPage() {
   });
   const [connectionStep, setConnectionStep] = useState(0);
   const [accountSuffix] = useState(() => Math.floor(1000 + Math.random() * 9000));
+  
+  const [searchQuery, setSearchQuery] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [isVerifyingPhone, setIsVerifyingPhone] = useState(false);
+  const [phoneVerifyStep, setPhoneVerifyStep] = useState(0);
 
   const selectedBankInfo = BANKS.find((bank) => bank.id === selectedBank);
   const currentStepIndex = stepOrder.indexOf(step);
+
+  const filteredBanks = useMemo(() => {
+    if (!searchQuery) return BANKS;
+    const query = searchQuery.toLowerCase();
+    return BANKS.filter(bank => bank.name.toLowerCase().includes(query) || bank.short.toLowerCase().includes(query));
+  }, [searchQuery]);
 
   const processingMessage = useMemo(() => {
     if (!selectedBankInfo) return 'Preparing secure AA session...';
@@ -69,7 +91,23 @@ export default function OnboardingPage() {
 
   const handleBankSelect = (bankId: string) => {
     setSelectedBank(bankId);
-    window.setTimeout(() => setStep('consent'), 260);
+    window.setTimeout(() => setStep('phone'), 260);
+  };
+
+  const handlePhoneVerify = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (phoneNumber.length < 10) return;
+    
+    setIsVerifyingPhone(true);
+    setPhoneVerifyStep(1);
+    
+    setTimeout(() => {
+      setPhoneVerifyStep(2);
+      setTimeout(() => {
+        setIsVerifyingPhone(false);
+        setStep('consent');
+      }, 1200);
+    }, 1200);
   };
 
   const handleConnect = () => {
@@ -96,7 +134,7 @@ export default function OnboardingPage() {
     initial: { opacity: 0, x: 48, scale: 0.98 },
     animate: { opacity: 1, x: 0, scale: 1 },
     exit: { opacity: 0, x: -48, scale: 0.98 },
-    transition: { duration: 0.42, ease: 'easeOut' },
+    transition: { duration: 0.42, ease: 'easeOut' as const },
   };
 
   return (
@@ -120,50 +158,171 @@ export default function OnboardingPage() {
 
         <AnimatePresence mode="wait">
           {step === 'bank' && (
-            <motion.section key="bank" {...cardMotion} className="glass-card rounded-lg border-white/70 bg-white/88 p-8 shadow-2xl shadow-primary/10">
-              <div className="mb-7 text-center">
-                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-lg gradient-primary shadow-xl shadow-primary/20">
-                  <Landmark className="h-7 w-7 text-primary-foreground" />
+            <motion.section key="bank" {...cardMotion} className="glass-card rounded-lg border-white/70 bg-white/88 p-6 sm:p-8 shadow-2xl shadow-primary/10 flex flex-col h-[600px] max-h-[85vh]">
+              <div className="shrink-0 mb-6 text-center">
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-lg gradient-primary shadow-xl shadow-primary/20 relative group">
+                  <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300 rounded-lg"></div>
+                  <Landmark className="h-7 w-7 text-primary-foreground transform group-hover:scale-110 transition-transform duration-300" />
                 </div>
-                <h1 className="font-heading text-2xl font-bold text-foreground">Connect Your Bank</h1>
-                <p className="mt-2 text-sm text-muted-foreground">Supported by Account Aggregator Framework</p>
+                <h1 className="font-heading text-2xl font-bold text-foreground">Select your bank</h1>
+                <p className="mt-2 text-sm text-muted-foreground">We partner with regulated financial institutions</p>
               </div>
 
-              <div className="space-y-3">
-                {BANKS.map((bank, index) => {
-                  const isSelected = selectedBank === bank.id;
+              <div className="shrink-0 mb-4 relative">
+                <input 
+                  type="text" 
+                  placeholder="Search bank..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-white/50 border border-border/60 rounded-lg pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all font-medium placeholder:text-muted-foreground/70"
+                />
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 absolute left-3.5 top-3.5 text-muted-foreground/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
 
-                  return (
-                    <motion.button
-                      key={bank.id}
-                      initial={{ opacity: 0, y: 16 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.08, duration: 0.35 }}
-                      whileHover={{ y: -4, scale: 1.02 }}
-                      whileTap={{ scale: 0.99 }}
-                      onClick={() => handleBankSelect(bank.id)}
-                      className={`group relative flex w-full items-center gap-4 overflow-hidden rounded-lg border p-4 text-left shadow-sm transition-colors duration-300 ${
-                        isSelected ? 'border-primary bg-primary/10' : 'border-border/70 bg-gradient-to-br from-white to-primary/5 hover:border-primary/50'
-                      }`}
-                      style={{ boxShadow: isSelected ? `0 18px 45px ${bank.color}22` : undefined }}
-                    >
-                      <div className="absolute inset-y-0 left-0 w-1 opacity-80" style={{ background: bank.color }} />
-                      <motion.div
-                        whileHover={{ scale: 1.08 }}
-                        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-lg font-bold text-white shadow-lg"
-                        style={{ background: `linear-gradient(135deg, ${bank.color}, hsl(174 62% 42%))` }}
+              <div className="flex-1 overflow-y-auto pr-1 -mr-1 space-y-3 custom-scrollbar" style={{ scrollbarWidth: 'thin' }}>
+                <AnimatePresence>
+                  {filteredBanks.map((bank, index) => {
+                    const isSelected = selectedBank === bank.id;
+
+                    return (
+                      <motion.button
+                        layout
+                        key={bank.id}
+                        initial={{ opacity: 0, y: 16 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{ delay: index * 0.04, duration: 0.35 }}
+                        whileHover={{ y: -2, scale: 1.01 }}
+                        whileTap={{ scale: 0.99 }}
+                        onClick={() => handleBankSelect(bank.id)}
+                        className={`group relative flex w-full items-center gap-4 overflow-hidden rounded-lg border p-4 text-left transition-all duration-300 ${
+                          isSelected ? 'border-primary bg-primary/10 shadow-[0_8px_30px_hsl(174_62%_40%/.15)]' : 'border-border/70 bg-gradient-to-br from-white to-primary/5 hover:border-primary/40 hover:shadow-md'
+                        }`}
+                        style={{ boxShadow: isSelected ? `0 18px 45px ${bank.color}22` : undefined }}
                       >
-                        {bank.mark}
-                      </motion.div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-foreground">{bank.name}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">Savings and current accounts</p>
-                      </div>
-                      <ChevronRight className="h-5 w-5 text-muted-foreground transition-transform duration-300 group-hover:translate-x-1 group-hover:text-primary" />
-                    </motion.button>
-                  );
-                })}
+                        <div className={`absolute inset-y-0 left-0 w-1 opacity-80 transition-all duration-300 ${isSelected ? 'w-full opacity-10' : ''}`} style={{ background: bank.color }} />
+                        <motion.div
+                          whileHover={{ scale: 1.08 }}
+                          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-lg font-bold text-white shadow-lg relative overflow-hidden ring-2 ring-white"
+                          style={{ background: `linear-gradient(135deg, ${bank.color}, hsl(220 20% 30%))` }}
+                        >
+                          <span className="relative z-10">{bank.mark}</span>
+                        </motion.div>
+                        <div className="min-w-0 flex-1 relative z-10">
+                          <p className={`font-semibold transition-colors ${isSelected ? 'text-primary' : 'text-foreground'}`}>{bank.name}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded text-white ${bank.type === 'Public' ? 'bg-indigo-500/80' : 'bg-emerald-500/80'}`}>
+                              {bank.type}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="relative z-10">
+                          {isSelected ? (
+                            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="h-6 w-6 rounded-full bg-primary flex items-center justify-center shadow-sm">
+                              <Check className="h-3.5 w-3.5 text-white" />
+                            </motion.div>
+                          ) : (
+                            <ChevronRight className="h-5 w-5 text-muted-foreground/50 transition-transform duration-300 group-hover:translate-x-1 group-hover:text-primary" />
+                          )}
+                        </div>
+                      </motion.button>
+                    );
+                  })}
+                </AnimatePresence>
+                {filteredBanks.length === 0 && (
+                  <div className="text-center py-10 opacity-60">
+                    <p className="text-sm">No banks found matching "{searchQuery}"</p>
+                  </div>
+                )}
               </div>
+            </motion.section>
+          )}
+
+          {step === 'phone' && selectedBankInfo && (
+            <motion.section key="phone" {...cardMotion} className="glass-card rounded-lg border-white/70 bg-white/88 p-8 shadow-2xl shadow-primary/10">
+              <div className="mb-6">
+                <button
+                  type="button"
+                  onClick={() => setStep('bank')}
+                  className="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground transition-colors hover:text-primary"
+                  disabled={isVerifyingPhone}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Change bank
+                </button>
+              </div>
+
+              <div className="mb-8 text-center">
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <h1 className="font-heading text-2xl font-bold text-foreground">Verify Your Mobile Number</h1>
+                <p className="mt-2 text-sm text-muted-foreground">Enter the mobile number linked to your {selectedBankInfo.short} account</p>
+              </div>
+
+              <form onSubmit={handlePhoneVerify} className="space-y-6">
+                <div className="relative">
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Mobile Number</label>
+                  <div className="flex rounded-lg overflow-hidden border border-border/70 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all shadow-sm bg-white/50">
+                    <div className="bg-muted/30 px-4 py-3 border-r border-border/70 flex items-center justify-center font-medium text-muted-foreground">
+                      +91
+                    </div>
+                    <input
+                      type="tel"
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      placeholder="Enter 10-digit number"
+                      className="flex-1 px-4 py-3 focus:outline-none bg-transparent font-medium tracking-wide text-foreground placeholder:font-normal placeholder:tracking-normal placeholder:text-muted-foreground/60"
+                      disabled={isVerifyingPhone}
+                      autoFocus
+                    />
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground flex items-center gap-1.5 opacity-80">
+                    <Lock className="h-3 w-3" />
+                    This helps us securely identify your account
+                  </p>
+                </div>
+
+                {isVerifyingPhone ? (
+                  <div className="space-y-3 p-4 bg-primary/5 rounded-lg border border-primary/10">
+                    <div className="flex items-center gap-3">
+                      <div className={`flex shrink-0 h-5 w-5 rounded-full items-center justify-center ${phoneVerifyStep >= 1 ? 'bg-success text-white' : 'border border-muted-foreground'}`}>
+                        {phoneVerifyStep >= 1 && <Check className="h-3 w-3" />}
+                      </div>
+                      <span className={`text-sm ${phoneVerifyStep >= 1 ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
+                        {phoneVerifyStep === 1 ? 'Verifying mobile number...' : 'Mobile number verified'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className={`flex shrink-0 h-5 w-5 rounded-full items-center justify-center ${phoneVerifyStep >= 2 ? 'bg-success text-white' : 'border border-primary/20'}`}>
+                        {phoneVerifyStep === 2 && <Check className="h-3 w-3 animate-fade-in" />}
+                        {phoneVerifyStep < 2 && <Loader2 className="h-3 w-3 text-primary animate-spin opacity-50" />}
+                      </div>
+                      <span className={`text-sm ${phoneVerifyStep >= 2 ? 'font-medium text-foreground animate-fade-in' : 'text-muted-foreground'}`}>
+                        {phoneVerifyStep >= 2 ? 'Linked with bank records successfully' : 'Linking with bank records...'}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <Button
+                    type="submit"
+                    disabled={phoneNumber.length !== 10}
+                    className="relative h-12 w-full overflow-hidden rounded-lg bg-[linear-gradient(135deg,hsl(174_62%_40%),hsl(190_76%_42%),hsl(174_62%_55%))] bg-[length:200%_100%] text-primary-foreground shadow-lg shadow-primary/20 transition-all duration-500 hover:-translate-y-0.5 hover:bg-[position:100%_0] active:scale-[0.99]"
+                  >
+                    Continue
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+                )}
+                
+                <div className="flex items-center justify-center gap-1.5 pt-2">
+                  <Shield className="h-3.5 w-3.5 text-success opacity-80" />
+                  <p className="text-[11px] font-medium text-muted-foreground">Your number is encrypted and used only for verification</p>
+                </div>
+              </form>
             </motion.section>
           )}
 
@@ -192,41 +351,55 @@ export default function OnboardingPage() {
                 <p className="mt-2 text-sm text-muted-foreground">Review the AA data request before authorising access</p>
               </div>
 
-              <div className="space-y-4 rounded-lg border border-border/70 bg-white/80 p-4">
+              <div className="space-y-4 rounded-lg border border-border/70 bg-white/80 p-5">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">Data Requested</p>
-                  <div className="mt-3 space-y-3">
+                  <div className="flex items-center justify-between mb-3">
+                     <p className="text-xs font-semibold uppercase tracking-wide text-primary border-b border-primary/20 pb-1 inline-block">Section 1: Data Requested</p>
+                  </div>
+                  <div className="space-y-3 bg-muted/30 p-3 rounded-lg border border-border/50">
                     {CONSENT_ITEMS.map(({ key, title, detail, Icon }) => (
                       <div key={key} className="flex items-center justify-between gap-4 border-b border-border/60 pb-3 last:border-b-0 last:pb-0">
                         <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                            <Icon className="h-5 w-5" />
+                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-sm text-primary">
+                            <Icon className="h-4 w-4" />
                           </div>
                           <div>
                             <p className="text-sm font-semibold text-foreground">{title}</p>
-                            <p className="text-xs text-muted-foreground">{detail}</p>
+                            <p className="text-[11px] text-muted-foreground leading-tight">{detail}</p>
                           </div>
                         </div>
                         <Switch
                           checked={permissions[key]}
                           onCheckedChange={(value) => setPermissions((current) => ({ ...current, [key]: value }))}
-                          className="data-[state=checked]:shadow-[0_0_18px_hsl(174_62%_40%/.35)]"
+                          className="data-[state=checked]:shadow-[0_0_12px_hsl(174_62%_40%/.25)]"
                         />
                       </div>
                     ))}
                   </div>
                 </div>
 
-                <div className="grid gap-3 border-t border-border/70 pt-4 sm:grid-cols-2">
-                  <div className="rounded-lg bg-muted/50 p-3">
-                    <p className="text-xs font-semibold text-muted-foreground">Purpose</p>
-                    <p className="mt-1 text-sm font-semibold text-foreground">To enable automated micro-investments</p>
+                <div className="grid gap-3 pt-2 sm:grid-cols-2">
+                  <div className="rounded-lg bg-primary/5 border border-primary/10 p-3.5 hover:bg-primary/10 transition-colors">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-primary">Section 2: Purpose</p>
+                    <p className="mt-1.5 text-sm font-medium text-foreground leading-snug">To enable automated micro-investment and financial insights</p>
                   </div>
-                  <div className="rounded-lg bg-muted/50 p-3">
-                    <p className="text-xs font-semibold text-muted-foreground">Duration</p>
-                    <p className="mt-1 text-sm font-semibold text-foreground">Valid for 12 months</p>
+                  <div className="rounded-lg bg-orange-500/5 border border-orange-500/10 p-3.5 hover:bg-orange-500/10 transition-colors">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-400">Section 3: Duration</p>
+                    <p className="mt-1.5 text-sm font-medium text-foreground leading-snug">Valid for 12 months (revocable anytime)</p>
                   </div>
                 </div>
+
+                <details className="group border border-border/50 rounded-lg bg-white/50">
+                  <summary className="flex cursor-pointer items-center justify-between p-3 text-xs font-semibold text-muted-foreground hover:text-foreground list-none">
+                    View full consent details
+                    <ChevronRight className="h-4 w-4 transition-transform group-open:rotate-90" />
+                  </summary>
+                  <div className="px-3 pb-3 pt-0 text-[11px] text-muted-foreground/80 space-y-2 border-t border-border/30 mt-1">
+                    <p>• Data is fetched securely via Sahamati AA network.</p>
+                    <p>• SpareSmart acts solely as a Financial Information User (FIU).</p>
+                    <p>• This consent is governed by Master Direction - Non-Banking Financial Company - Account Aggregator (Reserve Bank) Directions, 2016.</p>
+                  </div>
+                </details>
               </div>
 
               <div className="my-5 flex items-center justify-center gap-2 text-xs font-medium text-muted-foreground">
@@ -293,9 +466,10 @@ export default function OnboardingPage() {
                   })}
                 </div>
 
-                <div className="mt-7 h-2 overflow-hidden rounded-full bg-primary/10">
+                <div className="mt-7 h-2.5 overflow-hidden rounded-full bg-primary/10 relative">
+                  <div className="absolute inset-0 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.4),transparent)] -translate-x-full animate-[shimmer_2s_infinite]" />
                   <motion.div
-                    className="h-full rounded-full bg-[linear-gradient(90deg,hsl(174_62%_40%),hsl(152_60%_42%))]"
+                    className="h-full rounded-full bg-[linear-gradient(90deg,hsl(174_62%_40%),hsl(152_60%_42%),hsl(174_62%_50%))] bg-[length:200%_100%] animate-[shimmer_3s_linear_infinite]"
                     animate={{ width: `${Math.min(100, (connectionStep / PROCESSING_STEPS.length) * 100)}%` }}
                     transition={{ duration: 0.45, ease: 'easeOut' }}
                   />
@@ -313,43 +487,59 @@ export default function OnboardingPage() {
               transition={{ type: 'spring', stiffness: 170, damping: 18 }}
               className="relative overflow-hidden rounded-lg border border-success/20 bg-white/90 p-8 text-center shadow-2xl shadow-success/20 backdrop-blur-xl"
             >
-              {[...Array(14)].map((_, index) => (
+              {[...Array(24)].map((_, index) => (
                 <motion.span
                   key={index}
-                  initial={{ opacity: 0, y: 0, scale: 0.4 }}
-                  animate={{ opacity: [0, 0.65, 0], y: [-4, -80 - index * 2], x: (index % 2 === 0 ? 1 : -1) * (18 + index * 4), scale: [0.4, 1, 0.8] }}
-                  transition={{ duration: 1.8, delay: index * 0.04 }}
-                  className="absolute left-1/2 top-24 h-1.5 w-1.5 rounded-full bg-success/60"
+                  initial={{ opacity: 0, scale: 0 }}
+                  animate={{ 
+                    opacity: [0, 1, 0], 
+                    y: [0, -120 - Math.random() * 80], 
+                    x: [0, (Math.random() - 0.5) * 200], 
+                    scale: [0, Math.random() + 0.5, 0],
+                    rotate: [0, Math.random() * 360]
+                  }}
+                  transition={{ duration: 2.5, delay: Math.random() * 0.3, ease: 'easeOut' }}
+                  className={`absolute left-1/2 top-40 h-2.5 w-2.5 rounded-sm ${['bg-success/80', 'bg-primary/80', 'bg-yellow-400/80', 'bg-blue-400/80'][Math.floor(Math.random() * 4)]}`}
                 />
               ))}
 
-              <div className="absolute inset-x-10 top-8 h-36 rounded-full bg-success/15 blur-3xl" />
+              <div className="absolute inset-x-0 top-0 h-48 bg-[radial-gradient(ellipse_at_top,hsl(152_60%_85%/.6),transparent_70%)] blur-2xl" />
               <div className="relative">
                 <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ type: 'spring', stiffness: 220, damping: 15 }}
-                  className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-success/10 shadow-2xl shadow-success/25"
+                  initial={{ scale: 0, rotate: -45 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ type: 'spring', stiffness: 220, damping: 15, delay: 0.1 }}
+                  className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-white shadow-2xl shadow-success/25 ring-8 ring-success/10 relative overflow-hidden"
                 >
-                  <CheckCircle2 className="h-14 w-14 text-success" />
+                  <div className="absolute inset-0 bg-success/10 animate-[pulse-glow_2s_infinite_ease-in-out]"></div>
+                  <CheckCircle2 className="h-14 w-14 text-success relative z-10 drop-shadow-md" />
                 </motion.div>
-                <h1 className="font-heading text-3xl font-bold text-foreground">Bank Connected</h1>
-                <p className="mt-3 text-muted-foreground">{selectedBankInfo.name}</p>
-                <p className="mt-2 text-sm font-semibold text-success">Account securely linked via AA framework</p>
+                <motion.h1 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="font-heading text-3xl font-bold text-foreground">Bank Connected</motion.h1>
+                <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="mt-3 text-lg font-medium text-foreground">{selectedBankInfo.name}</motion.p>
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="mt-2 inline-flex items-center gap-1.5 bg-success/10 text-success px-3 py-1 rounded-full text-xs font-semibold border border-success/20">
+                  <Shield className="h-3.5 w-3.5" />
+                  Successfully connected via RBI-compliant AA network
+                </motion.div>
 
-                <div className="mx-auto my-7 inline-flex items-center gap-3 rounded-lg border border-success/20 bg-success/5 px-4 py-3">
-                  <WalletCards className="h-5 w-5 text-success" />
-                  <span className="font-mono text-sm font-semibold text-foreground">A/C: XXXX-XXXX-{accountSuffix}</span>
-                </div>
+                <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.6 }} className="mx-auto my-8 inline-flex flex-col items-center gap-2 rounded-xl border border-success/20 bg-gradient-to-b from-white to-success/5 px-8 py-5 shadow-sm relative overflow-hidden group">
+                  <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent,rgba(255,255,255,0.8),transparent)] -translate-x-[150%] group-hover:translate-x-[150%] transition-transform duration-1000 ease-in-out"></div>
+                  <WalletCards className="h-6 w-6 text-success/80 mb-1" />
+                  <span className="font-mono text-base font-bold text-foreground tracking-widest">
+                    <span className="opacity-40">••••</span> <span className="opacity-40">••••</span> <span className="opacity-40">••••</span> {accountSuffix}
+                  </span>
+                  <span className="text-[10px] uppercase font-semibold tracking-wider text-muted-foreground mr-1">Savings Account</span>
+                </motion.div>
 
-                <Button
-                  onClick={handleComplete}
-                  className="relative h-12 w-full overflow-hidden rounded-lg bg-[linear-gradient(135deg,hsl(152_60%_42%),hsl(174_62%_42%),hsl(152_60%_55%))] bg-[length:200%_100%] text-primary-foreground shadow-lg shadow-success/20 transition-all duration-500 hover:-translate-y-0.5 hover:bg-[position:100%_0] active:scale-[0.99]"
-                >
-                  <span className="absolute inset-0 scale-0 rounded-full bg-white/25 opacity-0 transition-all duration-300 active:scale-100 active:opacity-100" />
-                  Go to Dashboard
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
+                <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8 }}>
+                  <Button
+                    onClick={handleComplete}
+                    className="relative h-14 w-full overflow-hidden rounded-xl bg-[linear-gradient(135deg,hsl(152_60%_42%),hsl(174_62%_42%),hsl(152_60%_55%))] bg-[length:200%_100%] text-primary-foreground shadow-xl shadow-success/25 transition-all duration-500 hover:-translate-y-1 hover:shadow-2xl hover:shadow-success/30 hover:bg-[position:100%_0] active:scale-[0.98] text-base font-medium"
+                  >
+                    <span className="absolute inset-0 scale-0 rounded-full bg-white/20 opacity-0 transition-all duration-500 active:scale-[2.5] active:opacity-100" />
+                    Enter Dashboard
+                    <ArrowRight className="h-5 w-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                  </Button>
+                </motion.div>
               </div>
             </motion.section>
           )}
