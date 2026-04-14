@@ -1,5 +1,9 @@
 import { useState } from 'react';
 import { useApp } from '@/context/AppContext';
+import { useAuth } from '@/context/AuthContext';
+import { Wallet, Bell, Shield, Calculator } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Slider } from '@/components/ui/slider';
 
 export default function UserProfile() {
   const { user } = useAuth();

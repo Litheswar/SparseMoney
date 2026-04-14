@@ -4,6 +4,7 @@ import { Activity, BrainCircuit, Lightbulb, ShieldCheck, Target, TrendingDown, T
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useApp } from '@/context/AppContext';
 import { formatCurrency } from '@/lib/automation';
+import { format } from 'date-fns';
 
 const barPalette = ['hsl(174 62% 40%)', 'hsl(0 72% 55%)', 'hsl(38 92% 50%)', 'hsl(220 70% 50%)'];
 

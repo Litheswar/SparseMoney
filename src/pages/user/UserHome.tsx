@@ -1,6 +1,6 @@
 import { useApp } from '@/context/AppContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { TrendingUp, Wallet, Coins, ArrowUpRight, Zap, Bell, Play, Pause } from 'lucide-react';
+import { TrendingUp, Wallet, Coins, ArrowUpRight, Zap, Bell, Play, Pause, CheckCircle2, AlertCircle, Lightbulb } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useEffect, useState } from 'react';
@@ -147,16 +147,26 @@ export default function UserHome() {
               <Bell className="w-4 h-4 text-primary" />
               <h3 className="text-base font-semibold font-heading text-foreground">Alerts</h3>
             </div>
-            <div className="space-y-2 max-h-40 overflow-y-auto">
-              {notifications.slice(0, 5).map(n => (
-                <div key={n.id} className="text-xs p-2 rounded-lg bg-muted/30">
-                  <span className={n.type === 'success' ? 'text-success' : n.type === 'warning' ? 'text-warning' : 'text-foreground'}>
-                    {n.message}
-                  </span>
-                </div>
-              ))}
+            <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+              {notifications.slice(0, 5).map(n => {
+                const Icon = n.type === 'success' ? CheckCircle2 : n.type === 'warning' ? AlertCircle : Lightbulb;
+                const statusColor = n.type === 'success' ? 'text-success' : n.type === 'warning' ? 'text-warning' : 'text-primary';
+                
+                return (
+                  <div key={n.id} className="flex gap-3 p-3 rounded-xl bg-muted/30 border border-border/10 hover:bg-muted/50 transition-colors">
+                    <Icon className={`w-4 h-4 mt-0.5 shrink-0 ${statusColor}`} />
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-bold text-foreground leading-tight truncate">{n.title}</p>
+                      <p className="text-[10px] text-muted-foreground leading-tight mt-0.5 line-clamp-2">{n.description}</p>
+                    </div>
+                  </div>
+                );
+              })}
               {notifications.length === 0 && (
-                <p className="text-xs text-muted-foreground">No alerts yet</p>
+                <div className="py-8 text-center">
+                  <Bell className="w-8 h-8 text-muted/20 mx-auto mb-2" />
+                  <p className="text-xs text-muted-foreground">No recent alerts</p>
+                </div>
               )}
             </div>
           </div>

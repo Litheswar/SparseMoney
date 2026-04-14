@@ -45,7 +45,9 @@ export default function UserWalletAutomation() {
           <p className="text-2xl font-bold font-heading text-foreground">{formatCurrency(totalPortfolio)}</p>
           <p className="mt-1 flex items-center gap-1 text-xs text-success">
             <ArrowUpRight className="h-3 w-3" />
-            {((portfolio.reduce((sum, holding) => sum + holding.amount * holding.returns / 100, 0) / totalPortfolio) * 100).toFixed(1)}% returns
+            {totalPortfolio > 0 
+              ? ((portfolio.reduce((sum, holding) => sum + holding.amount * holding.returns / 100, 0) / totalPortfolio) * 100).toFixed(1)
+              : '0'}% returns
           </p>
         </motion.div>
 
