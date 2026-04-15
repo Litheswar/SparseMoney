@@ -25,6 +25,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { LogoutDialog } from './profile/LogoutDialog';
+import { PortfolioSettingsSheet } from './profile/PortfolioSettingsSheet';
+import { useNavigate } from 'react-router-dom';
+import { Progress } from '@/components/ui/progress';
+import { Zap as ZapIcon, PlusCircle, PauseCircle } from 'lucide-react';
 
 const userNav = [
   { to: '/dashboard', icon: Home, label: 'Home' },
@@ -153,9 +158,13 @@ const NavNavItem = ({ item, isCollapsed, isActive, onClick }: NavItemProps) => {
 
 export function PremiumSidebar({ className }: { className?: string }) {
   const { user, logout } = useAuth();
+  const { wallet, growthPercent, automationStats, groupContributions, isStreaming, setIsStreaming } = useApp();
   const location = useLocation();
+  const navigate = useNavigate();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [greeting, setGreeting] = useState('');
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   
   const navItems = user?.role === 'admin' ? adminNav : userNav;
 
@@ -284,56 +293,128 @@ export function PremiumSidebar({ className }: { className?: string }) {
       )}
 
       {/* User Section (Bottom) */}
-      <div className="p-4 mt-auto border-t border-white/5 bg-white/[0.02]">
+      <div className="p-4 mt-auto border-t border-[#4A9A6E]/5">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className={cn(
-               "w-full flex items-center gap-3 p-2 rounded-2xl hover:bg-white/5 transition-all duration-300 outline-none group",
+            <motion.button 
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className={cn(
+               "w-full flex items-center gap-3 p-2 rounded-2xl hover:bg-[#4A9A6E]/5 transition-all duration-300 outline-none group",
                isCollapsed ? "justify-center" : "justify-start"
             )}>
               <div className="relative shrink-0">
-                <Avatar className="w-9 h-9 border-2 border-primary/20 group-hover:border-primary transition-colors">
+                <Avatar className="w-9 h-9 border-2 border-[#4A9A6E]/20 group-hover:border-[#4A9A6E] transition-colors">
                   <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name}`} />
-                  <AvatarFallback className="bg-primary/20 text-primary font-bold">
+                  <AvatarFallback className="bg-[#4A9A6E]/20 text-[#4A9A6E] font-bold">
                     {user?.name?.charAt(0)}
                   </AvatarFallback>
                 </Avatar>
-                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-[#1e293b] rounded-full" />
+                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-[#10B981] border-2 border-[#F8FAF5] rounded-full" />
               </div>
               
               {!isCollapsed && (
                 <div className="flex flex-col items-start overflow-hidden">
-                  <span className="text-sm font-bold text-white truncate w-full">{user?.name}</span>
-                  <span className="text-[10px] text-sidebar-foreground/40 font-semibold uppercase tracking-wider">
-                    {user?.role === 'admin' ? 'Administrator' : 'Premium User'}
+                  <span className="text-sm font-bold text-[#1E2937] truncate w-full">{user?.name}</span>
+                  <span className="text-[10px] text-[#64748B] font-semibold uppercase tracking-wider">
+                    {user?.role === 'admin' ? 'Administrator' : 'Premium User ⭐'}
                   </span>
                 </div>
               )}
-            </button>
+            </motion.button>
           </DropdownMenuTrigger>
           <DropdownMenuContent 
             side="top" 
             align={isCollapsed ? "center" : "start"} 
-            className="w-60 mb-2 bg-white border-[#4A9A6E]/10 text-[#1E2937] rounded-[1.5rem] p-2 shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-300"
+            className="w-72 mb-2 bg-white border-[#4A9A6E]/10 text-[#1E2937] rounded-[2rem] p-3 shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-300"
           >
+            {/* Smart Status Section */}
+            <div className="px-3 py-4 mb-2 rounded-[1.5rem] bg-[#F8FAF5] border border-[#4A9A6E]/5">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <p className="text-[10px] uppercase tracking-widest text-[#64748B] font-bold">Wealth Balance</p>
+                  <p className="text-xl font-black font-heading text-[#1E2937]">₹{wallet.balance.toLocaleString()}</p>
+                </div>
+                <div className="bg-[#4A9A6E]/10 px-2 py-0.5 rounded-lg">
+                  <span className="text-[10px] font-bold text-[#4A9A6E]">+{growthPercent}%</span>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex justify-between text-[10px] font-bold text-[#64748B]">
+                  <span>GOAL: GOA TRIP 🏖️</span>
+                  <span>85%</span>
+                </div>
+                <Progress value={85} className="h-1.5 bg-[#4A9A6E]/10" />
+                <div className="flex items-center gap-2 mt-2">
+                  <div className="w-2 h-2 rounded-full bg-[#10B981] animate-pulse" />
+                  <p className="text-[9px] text-[#64748B] font-medium">+₹7 saved 2 mins ago</p>
+                </div>
+              </div>
+            </div>
+
             <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-[#64748B] px-3 py-2">
               Wealth Control
             </DropdownMenuLabel>
-            <DropdownMenuItem className="rounded-xl px-3 py-2.5 focus:bg-[#4A9A6E]/10 focus:text-[#4A9A6E] cursor-pointer gap-3 transition-colors">
-              <User className="w-4 h-4" /> View Profile
-            </DropdownMenuItem>
-            <DropdownMenuItem className="rounded-xl px-3 py-2.5 focus:bg-[#4A9A6E]/10 focus:text-[#4A9A6E] cursor-pointer gap-3 transition-colors">
-              <Settings className="w-4 h-4" /> Portfolio Settings
-            </DropdownMenuItem>
-            <DropdownMenuSeparator className="bg-[#4A9A6E]/5 my-1" />
             <DropdownMenuItem 
-              onClick={logout}
-              className="rounded-xl px-3 py-2.5 text-rose-500 focus:bg-rose-500/10 focus:text-rose-500 cursor-pointer gap-3 transition-colors"
+              onClick={() => navigate('/dashboard/profile')}
+              className="rounded-xl px-3 py-2.5 focus:bg-[#4A9A6E]/10 focus:text-[#4A9A6E] cursor-pointer group/item transition-all"
             >
-              <LogOut className="w-4 h-4" /> Sign Out
+              <motion.div className="flex items-center gap-3 w-full" whileHover={{ x: 3 }}>
+                <User className="w-4 h-4 group-hover/item:text-[#4A9A6E] transition-colors" /> 
+                <span className="flex-1">View Profile</span>
+                <ChevronRight className="w-3 h-3 opacity-0 group-hover/item:opacity-100 transition-all" />
+              </motion.div>
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              onClick={() => setShowSettings(true)}
+              className="rounded-xl px-3 py-2.5 focus:bg-[#4A9A6E]/10 focus:text-[#4A9A6E] cursor-pointer group/item transition-all"
+            >
+              <motion.div className="flex items-center gap-3 w-full" whileHover={{ x: 3 }}>
+                <Settings className="w-4 h-4 group-hover/item:rotate-90 transition-all duration-500" /> 
+                <span className="flex-1">Portfolio Settings</span>
+                <ChevronRight className="w-3 h-3 opacity-0 group-hover/item:opacity-100 transition-all" />
+              </motion.div>
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator className="bg-[#4A9A6E]/5 my-2" />
+            
+            {/* Quick Actions */}
+            <div className="grid grid-cols-2 gap-2 px-1 mb-2">
+              <button className="flex items-center justify-center gap-2 py-2 rounded-xl bg-[#4A9A6E]/5 text-[#4A9A6E] text-[10px] font-bold hover:bg-[#4A9A6E]/10 transition-colors">
+                <PlusCircle className="w-3 h-3" /> Add Money
+              </button>
+              <button onClick={() => setIsStreaming(!isStreaming)} className="flex items-center justify-center gap-2 py-2 rounded-xl bg-[#F59E0B]/5 text-[#F59E0B] text-[10px] font-bold hover:bg-[#F59E0B]/10 transition-colors">
+                <PauseCircle className="w-3 h-3" /> {isStreaming ? 'Pause Rules' : 'Start Rules'}
+              </button>
+            </div>
+
+            <DropdownMenuItem 
+              onClick={() => setShowLogoutConfirm(true)}
+              className="rounded-xl px-3 py-2.5 text-rose-500 focus:bg-rose-500/10 focus:text-rose-500 cursor-pointer group/item transition-all"
+            >
+              <motion.div className="flex items-center gap-3 w-full" whileHover={{ x: 3 }}>
+                <LogOut className="w-4 h-4 group-hover/item:-translate-x-1 transition-transform" /> 
+                <span className="flex-1">Sign Out</span>
+              </motion.div>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        <LogoutDialog 
+          open={showLogoutConfirm} 
+          onOpenChange={setShowLogoutConfirm}
+          onConfirm={() => {
+            setShowLogoutConfirm(false);
+            logout();
+            navigate('/login');
+          }}
+        />
+
+        <PortfolioSettingsSheet 
+          open={showSettings}
+          onOpenChange={setShowSettings}
+        />
       </div>
     </motion.aside>
   );

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -14,6 +15,7 @@ import {
   Lock,
   ReceiptText,
   Shield,
+  TrendingUp,
   WalletCards,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -57,6 +59,8 @@ const stepOrder: Step[] = ['bank', 'phone', 'consent', 'connecting', 'success'];
 
 export default function OnboardingPage() {
   const { completeOnboarding } = useAuth();
+  const navigate = useNavigate();
+  const [isFinishing, setIsFinishing] = useState(false);
   const [step, setStep] = useState<Step>('bank');
   const [selectedBank, setSelectedBank] = useState('');
   const [permissions, setPermissions] = useState<Record<PermissionKey, boolean>>({
@@ -127,7 +131,13 @@ export default function OnboardingPage() {
   };
 
   const handleComplete = () => {
+    setIsFinishing(true);
     completeOnboarding(selectedBankInfo?.short || 'BANK');
+    
+    // Explicitly navigate after a brief delay to show the transition UI
+    setTimeout(() => {
+      navigate('/dashboard');
+    }, 2800);
   };
 
   const cardMotion = {
@@ -561,6 +571,72 @@ export default function OnboardingPage() {
                 </motion.div>
               </div>
             </motion.section>
+          )}
+        </AnimatePresence>
+
+        {/* Preparing Dashboard Overlay */}
+        <AnimatePresence>
+          {isFinishing && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#F8FAF5]/95 backdrop-blur-xl"
+            >
+              <div className="relative mb-12">
+                <motion.div
+                  animate={{ 
+                    scale: [1, 1.1, 1],
+                    rotate: [0, 360]
+                  }}
+                  transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                  className="w-24 h-24 rounded-[2rem] bg-gradient-to-br from-[#4A9A6E] to-[#4A9A6E]/30 flex items-center justify-center shadow-2xl shadow-[#4A9A6E]/20"
+                >
+                  <TrendingUp className="w-10 h-10 text-white" />
+                </motion.div>
+                <motion.div
+                  animate={{ scale: [1, 1.5, 1], opacity: [0.1, 0.3, 0.1] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                  className="absolute inset-0 bg-[#4A9A6E] rounded-full blur-2xl"
+                />
+              </div>
+              
+              <div className="text-center space-y-4 max-w-sm px-6">
+                <motion.h2 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-2xl font-black font-heading text-[#1E2937]"
+                >
+                  Initializing Intelligence
+                </motion.h2>
+                <motion.p 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                  className="text-sm font-medium text-[#64748B] leading-relaxed"
+                >
+                  Synchronizing your financial graph with <span className="text-[#4A9A6E] font-bold">{selectedBankInfo?.name}</span>. Setting up your premium wealth control center...
+                </motion.p>
+                
+                <div className="pt-8 flex flex-col items-center gap-3">
+                  <div className="w-48 h-1.5 bg-[#4A9A6E]/10 rounded-full overflow-hidden relative">
+                    <motion.div 
+                      className="absolute inset-y-0 left-0 bg-[#4A9A6E] rounded-full"
+                      initial={{ width: "0%" }}
+                      animate={{ width: "100%" }}
+                      transition={{ duration: 2.5, ease: "easeInOut" }}
+                    />
+                  </div>
+                  <motion.span 
+                    animate={{ opacity: [0.4, 1, 0.4] }}
+                    transition={{ duration: 1.5, repeat: Infinity }}
+                    className="text-[10px] font-bold uppercase tracking-widest text-[#4A9A6E]"
+                  >
+                    Encrypted Tunnel Active
+                  </motion.span>
+                </div>
+              </div>
+            </motion.div>
           )}
         </AnimatePresence>
       </div>

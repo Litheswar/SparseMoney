@@ -26,7 +26,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
-    <div className="min-h-screen bg-background flex p-0 lg:p-0">
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="min-h-screen bg-background flex p-0 lg:p-0"
+    >
       {/* Desktop Floating Sidebar */}
       <PremiumSidebar className="hidden lg:flex shrink-0" />
 
@@ -104,6 +108,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </AnimatePresence>
         </main>
       </div>
-    </div>
+    </motion.div>
   );
 }

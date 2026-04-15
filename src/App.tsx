@@ -30,58 +30,78 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+function AuthGuard({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useAuth();
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
+
+function OnboardingGuard({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  if (user?.role === 'user' && !user.bankConnected) {
+    return <Navigate to="/onboarding" replace />;
+  }
+  return <>{children}</>;
+}
+
 function AppRoutes() {
   const { user, isAuthenticated } = useAuth();
 
-  if (!isAuthenticated) {
-    return (
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    );
-  }
-
-  // User needs onboarding
-  if (user?.role === 'user' && !user.bankConnected) {
-    return (
-      <Routes>
-        <Route path="*" element={<OnboardingPage />} />
-      </Routes>
-    );
-  }
-
-  // Admin routes
-  if (user?.role === 'admin') {
-    return (
-      <Routes>
-        <Route path="/admin" element={<DashboardLayout><AdminOverview /></DashboardLayout>} />
-        <Route path="/admin/transactions" element={<DashboardLayout><AdminTransactions /></DashboardLayout>} />
-        <Route path="/admin/engine" element={<DashboardLayout><AdminEngine /></DashboardLayout>} />
-        <Route path="/admin/anomaly" element={<DashboardLayout><AdminAnomaly /></DashboardLayout>} />
-        <Route path="/admin/behavior" element={<DashboardLayout><AdminBehavior /></DashboardLayout>} />
-        <Route path="/admin/rules" element={<DashboardLayout><AdminRules /></DashboardLayout>} />
-        <Route path="/admin/audit" element={<DashboardLayout><AdminAudit /></DashboardLayout>} />
-        <Route path="/admin/health" element={<DashboardLayout><AdminHealth /></DashboardLayout>} />
-        <Route path="*" element={<Navigate to="/admin" replace />} />
-      </Routes>
-    );
-  }
-
-  // User routes
   return (
     <Routes>
-      <Route path="/dashboard" element={<DashboardLayout><UserHome /></DashboardLayout>} />
-      <Route path="/dashboard/transactions" element={<DashboardLayout><UserTransactions /></DashboardLayout>} />
-      <Route path="/dashboard/wallet" element={<DashboardLayout><UserWallet /></DashboardLayout>} />
-      <Route path="/dashboard/insights" element={<DashboardLayout><UserInsights /></DashboardLayout>} />
-      <Route path="/dashboard/rules" element={<DashboardLayout><UserRules /></DashboardLayout>} />
-      <Route path="/dashboard/horizon" element={<DashboardLayout><UserHorizon /></DashboardLayout>} />
-      <Route path="/dashboard/groups" element={<DashboardLayout><UserGroups /></DashboardLayout>} />
-      <Route path="/dashboard/groups/:id" element={<DashboardLayout><GroupDetails /></DashboardLayout>} />
-      <Route path="/dashboard/profile" element={<DashboardLayout><UserProfile /></DashboardLayout>} />
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      {/* Public Routes */}
+      <Route path="/" element={!isAuthenticated ? <LandingPage /> : <Navigate to={user?.role === 'admin' ? '/admin' : '/dashboard'} replace />} />
+      <Route path="/login" element={!isAuthenticated ? <LoginPage /> : <Navigate to={user?.role === 'admin' ? '/admin' : '/dashboard'} replace />} />
+
+      {/* Onboarding Flow */}
+      <Route 
+        path="/onboarding" 
+        element={
+          <AuthGuard>
+            {user?.role === 'user' && !user.bankConnected ? <OnboardingPage /> : <Navigate to="/dashboard" replace />}
+          </AuthGuard>
+        } 
+      />
+
+      {/* Admin Protected Routes */}
+      <Route path="/admin/*" element={
+        <AuthGuard>
+          <Routes>
+            <Route path="/" element={<DashboardLayout><AdminOverview /></DashboardLayout>} />
+            <Route path="/transactions" element={<DashboardLayout><AdminTransactions /></DashboardLayout>} />
+            <Route path="/engine" element={<DashboardLayout><AdminEngine /></DashboardLayout>} />
+            <Route path="/anomaly" element={<DashboardLayout><AdminAnomaly /></DashboardLayout>} />
+            <Route path="/behavior" element={<DashboardLayout><AdminBehavior /></DashboardLayout>} />
+            <Route path="/rules" element={<DashboardLayout><AdminRules /></DashboardLayout>} />
+            <Route path="/audit" element={<DashboardLayout><AdminAudit /></DashboardLayout>} />
+            <Route path="/health" element={<DashboardLayout><AdminHealth /></DashboardLayout>} />
+            <Route path="*" element={<Navigate to="/admin" replace />} />
+          </Routes>
+        </AuthGuard>
+      } />
+
+      {/* User Protected Routes */}
+      <Route path="/dashboard/*" element={
+        <AuthGuard>
+          <OnboardingGuard>
+            <Routes>
+              <Route path="/" element={<DashboardLayout><UserHome /></DashboardLayout>} />
+              <Route path="/transactions" element={<DashboardLayout><UserTransactions /></DashboardLayout>} />
+              <Route path="/wallet" element={<DashboardLayout><UserWallet /></DashboardLayout>} />
+              <Route path="/insights" element={<DashboardLayout><UserInsights /></DashboardLayout>} />
+              <Route path="/rules" element={<DashboardLayout><UserRules /></DashboardLayout>} />
+              <Route path="/horizon" element={<DashboardLayout><UserHorizon /></DashboardLayout>} />
+              <Route path="/groups" element={<DashboardLayout><UserGroups /></DashboardLayout>} />
+              <Route path="/groups/:id" element={<DashboardLayout><GroupDetails /></DashboardLayout>} />
+              <Route path="/profile" element={<DashboardLayout><UserProfile /></DashboardLayout>} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </OnboardingGuard>
+        </AuthGuard>
+      } />
+
+      {/* Fallback */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
