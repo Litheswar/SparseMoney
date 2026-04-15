@@ -1,23 +1,53 @@
 import { useAuth } from '@/context/AuthContext';
+import { useApp } from '@/context/AppContext';
 import { motion } from 'framer-motion';
-import { UserCircle, Bell, Shield, Wallet, Calculator, Loader2, CreditCard } from 'lucide-react';
+import { Bell, Shield, Wallet, Calculator, Loader2, CreditCard, Check } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
-import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { useState, useEffect, useRef } from 'react';
 import { api } from '@/lib/api';
+
+interface Allocation {
+  name: string;
+  label: string;
+  percentage: number;
+}
+
+const DEFAULT_ALLOCATIONS: Allocation[] = [
+  { name: 'gold', label: 'Gold ETF', percentage: 30 },
+  { name: 'index', label: 'Index Fund', percentage: 40 },
+  { name: 'debt', label: 'Debt Fund', percentage: 20 },
+  { name: 'fd', label: 'Fixed Deposit', percentage: 10 },
+];
+
+const LABEL_MAP: Record<string, string> = {
+  gold: 'Gold ETF',
+  index: 'Index Fund',
+  debt: 'Debt Fund',
+  fd: 'Fixed Deposit',
+};
 
 export default function UserProfile() {
   const { user } = useAuth();
+  const { updateThreshold } = useApp();
+
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const [threshold, setThreshold] = useState(500);
+  const [allocations, setAllocations] = useState<Allocation[]>(DEFAULT_ALLOCATIONS);
+  const [totalInvested, setTotalInvested] = useState(0);
   const [settings, setSettings] = useState({
-    auto_invest_threshold: 500,
     notify_roundup: true,
     notify_investment: true,
     notify_weekly: true,
     notify_risk: false,
   });
-  const [allocations, setAllocations] = useState<{ name: string; percentage: number }[]>([]);
-  const [totalInvested, setTotalInvested] = useState(0);
+
+  // Debounce timer ref for auto-save
+  const saveTimer = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
     async function load() {
@@ -27,15 +57,23 @@ export default function UserProfile() {
           api.wallet.allocations(),
           api.wallet.get(),
         ]);
+        setThreshold(Number(s?.auto_invest_threshold) || 500);
         setSettings({
-          auto_invest_threshold: Number(s.auto_invest_threshold) || 500,
-          notify_roundup: s.notify_roundup ?? true,
-          notify_investment: s.notify_investment ?? true,
-          notify_weekly: s.notify_weekly ?? true,
-          notify_risk: s.notify_risk ?? false,
+          notify_roundup: s?.notify_roundup ?? true,
+          notify_investment: s?.notify_investment ?? true,
+          notify_weekly: s?.notify_weekly ?? true,
+          notify_risk: s?.notify_risk ?? false,
         });
-        setAllocations(a || []);
-        setTotalInvested(w.totalInvested || 0);
+        if (a && a.length > 0) {
+          setAllocations(
+            a.map((item: any) => ({
+              name: item.name,
+              label: LABEL_MAP[item.name] || item.name,
+              percentage: Number(item.percentage),
+            }))
+          );
+        }
+        setTotalInvested(w?.totalInvested || 0);
       } catch (err) {
         console.error('Profile load error:', err);
       } finally {
@@ -44,6 +82,45 @@ export default function UserProfile() {
     }
     load();
   }, []);
+
+  // --- Debounced save to backend ---
+  const scheduleSave = (newThreshold: number, newSettings: typeof settings) => {
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      setSaving(true);
+      try {
+        await api.profile.updateSettings({
+          auto_invest_threshold: newThreshold,
+          ...newSettings,
+        });
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      } catch (err) {
+        console.error('Save settings error:', err);
+      } finally {
+        setSaving(false);
+      }
+    }, 700);
+  };
+
+  const handleThresholdChange = (val: number[]) => {
+    const v = val[0];
+    setThreshold(v);
+    updateThreshold(v); // propagate instantly to wallet progress bar on dashboard
+    scheduleSave(v, settings);
+  };
+
+  const handleAllocationChange = (name: string, val: number[]) => {
+    setAllocations(prev => prev.map(a => a.name === name ? { ...a, percentage: val[0] } : a));
+  };
+
+  const handleNotificationChange = (key: keyof typeof settings, v: boolean) => {
+    const next = { ...settings, [key]: v };
+    setSettings(next);
+    scheduleSave(threshold, next);
+  };
+
+  const totalAllocation = allocations.reduce((s, a) => s + a.percentage, 0);
 
   const generateUPI = () => {
     if (!user?.name) return '';
@@ -56,8 +133,13 @@ export default function UserProfile() {
 
   return (
     <div className="max-w-3xl space-y-6">
-      <div>
+      {/* Save Indicator */}
+      <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold font-heading text-foreground">Profile & Settings</h1>
+        <div className="flex items-center gap-2 text-sm">
+          {saving && <span className="text-muted-foreground flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Saving...</span>}
+          {saved && !saving && <span className="text-success flex items-center gap-1"><Check className="w-3 h-3" /> Saved</span>}
+        </div>
       </div>
 
       {/* Profile Card */}
@@ -72,56 +154,71 @@ export default function UserProfile() {
             {user?.bankName} · {user?.maskedAccount}
           </p>
         </div>
-        {user?.upiId && (
-          <div className="hidden sm:flex items-center gap-2 bg-primary/5 border border-primary/15 rounded-lg px-3 py-2">
-            <CreditCard className="w-4 h-4 text-primary" />
-            <div>
-              <p className="text-[10px] text-muted-foreground">UPI ID</p>
-              <p className="text-xs font-bold font-mono text-primary">{user.upiId || generateUPI()}</p>
-            </div>
+        <div className="hidden sm:flex items-center gap-2 bg-primary/5 border border-primary/15 rounded-lg px-3 py-2">
+          <CreditCard className="w-4 h-4 text-primary" />
+          <div>
+            <p className="text-[10px] text-muted-foreground">UPI ID</p>
+            <p className="text-xs font-bold font-mono text-primary">{user?.upiId || generateUPI()}</p>
           </div>
-        )}
-      </div>
-
-      {/* Allocation */}
-      <div className="glass-card p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <Wallet className="w-5 h-5 text-primary" />
-          <h3 className="text-base font-semibold font-heading text-foreground">Investment Allocation</h3>
         </div>
-        {allocations.length > 0 ? (
-          allocations.map(a => (
-            <div key={a.name} className="mb-3">
-              <div className="flex justify-between text-sm mb-1">
-                <span className="text-foreground capitalize">{a.name}</span>
-                <span className="text-muted-foreground">{a.percentage}%</span>
-              </div>
-              <Slider value={[a.percentage]} min={0} max={100} step={5} disabled />
-            </div>
-          ))
-        ) : (
-          <div className="grid grid-cols-2 gap-3">
-            {[{ key: 'gold', label: 'Gold ETF', val: 30 }, { key: 'index', label: 'Index Fund', val: 40 }, { key: 'debt', label: 'Debt Fund', val: 20 }, { key: 'fd', label: 'Fixed Deposit', val: 10 }].map(a => (
-              <div key={a.key} className="mb-3">
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-foreground">{a.label}</span>
-                  <span className="text-muted-foreground">{a.val}%</span>
-                </div>
-                <Slider value={[a.val]} min={0} max={100} step={5} disabled />
-              </div>
-            ))}
+      </div>
+
+      {/* Investment Allocation */}
+      <div className="glass-card p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Wallet className="w-5 h-5 text-primary" />
+            <h3 className="text-base font-semibold font-heading text-foreground">Investment Allocation</h3>
           </div>
+          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${totalAllocation === 100 ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>
+            {totalAllocation}% / 100%
+          </span>
+        </div>
+        <div className="space-y-5">
+          {allocations.map(a => (
+            <div key={a.name}>
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-foreground font-medium">{a.label}</span>
+                <span className="text-primary font-bold">{a.percentage}%</span>
+              </div>
+              <Slider
+                value={[a.percentage]}
+                onValueChange={(val) => handleAllocationChange(a.name, val)}
+                min={0}
+                max={100}
+                step={5}
+                className="cursor-pointer"
+              />
+            </div>
+          ))}
+        </div>
+        {totalAllocation !== 100 && (
+          <p className="text-xs text-warning mt-3">⚠ Total allocation should equal 100%. Adjust sliders accordingly.</p>
         )}
       </div>
 
-      {/* Threshold */}
+      {/* Auto-Invest Threshold */}
       <div className="glass-card p-5">
         <div className="flex items-center gap-2 mb-4">
           <Shield className="w-5 h-5 text-primary" />
           <h3 className="text-base font-semibold font-heading text-foreground">Auto-Invest Threshold</h3>
         </div>
-        <p className="text-sm text-muted-foreground mb-3">Invest automatically when wallet reaches ₹{settings.auto_invest_threshold}</p>
-        <Slider value={[settings.auto_invest_threshold]} min={100} max={5000} step={50} disabled />
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm text-muted-foreground">Invest automatically when wallet reaches</p>
+          <span className="text-lg font-bold text-primary">₹{threshold.toLocaleString('en-IN')}</span>
+        </div>
+        <Slider
+          value={[threshold]}
+          onValueChange={handleThresholdChange}
+          min={100}
+          max={5000}
+          step={50}
+          className="cursor-pointer"
+        />
+        <div className="flex justify-between text-xs text-muted-foreground mt-2">
+          <span>₹100</span>
+          <span>₹5,000</span>
+        </div>
       </div>
 
       {/* Tax Planner */}
@@ -135,6 +232,12 @@ export default function UserProfile() {
             <p className="text-xs text-muted-foreground">Section 80C</p>
             <p className="text-lg font-bold text-foreground">₹{totalInvested.toLocaleString('en-IN')}</p>
             <p className="text-xs text-muted-foreground">of ₹1,50,000</p>
+            <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
+              <div
+                className="h-full gradient-primary rounded-full transition-all"
+                style={{ width: `${Math.min((totalInvested / 150000) * 100, 100)}%` }}
+              />
+            </div>
           </div>
           <div className="bg-muted/30 rounded-xl p-3">
             <p className="text-xs text-muted-foreground">Section 80D</p>
@@ -150,16 +253,22 @@ export default function UserProfile() {
           <Bell className="w-5 h-5 text-primary" />
           <h3 className="text-base font-semibold font-heading text-foreground">Notifications</h3>
         </div>
-        <div className="space-y-3">
+        <div className="space-y-4">
           {([
-            { key: 'notify_roundup', label: 'Round-up alerts' },
-            { key: 'notify_investment', label: 'Investment triggers' },
-            { key: 'notify_weekly', label: 'Weekly reports' },
-            { key: 'notify_risk', label: 'Risk warnings' },
-          ] as const).map(item => (
+            { key: 'notify_roundup' as const, label: 'Round-up alerts', desc: 'Get notified on every round-up' },
+            { key: 'notify_investment' as const, label: 'Investment triggers', desc: 'Alert when auto-invest fires' },
+            { key: 'notify_weekly' as const, label: 'Weekly reports', desc: 'Weekly savings summary' },
+            { key: 'notify_risk' as const, label: 'Risk warnings', desc: 'Unusual activity alerts' },
+          ]).map(item => (
             <div key={item.key} className="flex items-center justify-between">
-              <span className="text-sm text-foreground">{item.label}</span>
-              <Switch checked={settings[item.key]} onCheckedChange={v => setSettings(s => ({ ...s, [item.key]: v }))} />
+              <div>
+                <p className="text-sm font-medium text-foreground">{item.label}</p>
+                <p className="text-xs text-muted-foreground">{item.desc}</p>
+              </div>
+              <Switch
+                checked={settings[item.key]}
+                onCheckedChange={v => handleNotificationChange(item.key, v)}
+              />
             </div>
           ))}
         </div>

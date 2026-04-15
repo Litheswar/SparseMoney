@@ -37,6 +37,7 @@ interface AppContextType {
   lastInvestment: { amount: number; timestamp: Date } | null;
   loading: boolean;
   refreshDashboard: () => Promise<void>;
+  updateThreshold: (threshold: number) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -139,6 +140,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const updateThreshold = useCallback((threshold: number) => {
+    setWallet(prev => ({ ...prev, threshold }));
+  }, []);
+
   // Streaming mode
   useEffect(() => {
     if (isStreaming) {
@@ -156,6 +161,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       wallet, transactions, notifications,
       weeklySpare, growthPercent, isStreaming, setIsStreaming,
       simulateTransaction, lastInvestment, loading, refreshDashboard,
+      updateThreshold,
     }}>
       {children}
     </AppContext.Provider>
