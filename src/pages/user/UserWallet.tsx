@@ -83,21 +83,21 @@ export default function UserWallet() {
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
-        className="glass-card p-8 bg-gradient-to-r from-teal-500/5 via-primary/5 to-transparent border-teal-500/20"
+        className="glass-card p-8 bg-gradient-to-r from-[#4A9A6E]/5 via-[#D4A017]/5 to-transparent border-[#4A9A6E]/10"
       >
         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-6">
-            <div className="w-16 h-16 rounded-2xl bg-teal-500/20 flex items-center justify-center">
-              <Users className="w-8 h-8 text-teal-500" />
+            <div className="w-16 h-16 rounded-2xl bg-[#4A9A6E]/10 flex items-center justify-center">
+              <Users className="w-8 h-8 text-[#4A9A6E]" />
             </div>
             <div>
-              <h3 className="text-xl font-bold font-heading text-foreground">Group Power</h3>
-              <p className="text-sm text-muted-foreground">You've contributed {formatCurrency(myGroupContributions)} across {groups.length} groups this month.</p>
+              <h3 className="text-xl font-bold font-heading text-foreground">Wealth Synergy</h3>
+              <p className="text-sm text-muted-foreground">You've pooled {formatCurrency(myGroupContributions)} across {groups.length} intelligence groups this month.</p>
             </div>
           </div>
           <div className="flex flex-col items-end">
-            <button className="px-6 py-3 rounded-xl bg-teal-500 text-white font-bold text-sm shadow-lg shadow-teal-500/20 hover:bg-teal-600 transition-all flex items-center gap-2 group">
-              Manage Groups
+            <button className="px-6 py-3 rounded-xl bg-[#4A9A6E] text-white font-bold text-sm shadow-lg shadow-[#4A9A6E]/20 hover:bg-[#3d835d] transition-all flex items-center gap-2 group">
+              Global Strategy
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </button>
           </div>

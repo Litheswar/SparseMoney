@@ -69,15 +69,15 @@ export const AutomationStatus: React.FC<AutomationStatusProps> = ({ rules, onTog
           </motion.div>
         ))}
         
-        {/* Missed Potential Alert */}
+        {/* Wealth Opportunity Alert */}
         <motion.div 
           whileHover={{ scale: 1.02 }}
-          className="p-4 rounded-2xl border border-destructive/20 bg-destructive/5 flex flex-col justify-center items-center text-center group cursor-help"
+          className="p-4 rounded-2xl border border-[#D4A017]/20 bg-[#D4A017]/5 flex flex-col justify-center items-center text-center group cursor-help"
         >
-          <AlertTriangle className="w-6 h-6 text-destructive mb-2 group-hover:scale-110 transition-transform" />
-          <h4 className="text-[11px] font-bold text-destructive uppercase tracking-widest">Missed Potential</h4>
-          <p className="text-lg font-bold text-foreground mt-1">₹120</p>
-          <p className="text-[9px] text-muted-foreground max-w-[120px]">Lost this week due to inactive rules</p>
+          <AlertTriangle className="w-6 h-6 text-[#D4A017] mb-2 group-hover:scale-110 transition-transform" />
+          <h4 className="text-[11px] font-bold text-[#D4A017] uppercase tracking-widest">Growth Nudge</h4>
+          <p className="text-xl font-black font-heading text-[#1E2937] mt-1">₹120</p>
+          <p className="text-[9px] text-[#64748B] max-w-[120px]">Idle capital detected. Relink rules to capture gains.</p>
         </motion.div>
       </div>
     </div>

@@ -96,14 +96,14 @@ const NavNavItem = ({ item, isCollapsed, isActive, onClick }: NavItemProps) => {
             >
               <item.icon className={cn(
                 "w-5 h-5 transition-colors",
-                isActive ? "text-primary transition-none" : "group-hover:text-primary"
+                isActive ? "text-[#4A9A6E] transition-none" : "group-hover:text-[#4A9A6E]"
               )} />
               
               {/* Context Aware Indicators */}
               {(item.badge || item.warning || (item.count && item.count > 0)) && (
                 <span className={cn(
                   "absolute -top-1 -right-1 w-2 h-2 rounded-full",
-                  item.warning ? "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]" : "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]",
+                  item.warning ? "bg-[#D4A017] shadow-[0_0_8px_rgba(212,160,23,0.6)]" : "bg-[#10B981] shadow-[0_0_8px_rgba(16,185,129,0.4)]",
                   isActive || "animate-pulse"
                 )} />
               )}
@@ -189,15 +189,15 @@ export function PremiumSidebar({ className }: { className?: string }) {
               exit={{ opacity: 0, scale: 0.8 }}
               className="flex items-center gap-3"
             >
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center teal-glow-md">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#4A9A6E] to-[#4A9A6E]/70 flex items-center justify-center sage-glow-md">
                 <TrendingUp className="w-6 h-6 text-white" />
               </div>
               <div className="flex flex-col">
-                <span className="text-xl font-black font-heading text-white tracking-tight">
+                <span className="text-xl font-black font-heading text-[#1E2937] tracking-tight">
                   SpareSmart
                 </span>
-                <span className="text-[10px] font-bold text-primary tracking-[0.2em] uppercase leading-none mt-1">
-                  Fintech
+                <span className="text-[10px] font-bold text-[#4A9A6E] tracking-[0.2em] uppercase leading-none mt-1">
+                  Wealth
                 </span>
               </div>
             </motion.div>
@@ -207,7 +207,7 @@ export function PremiumSidebar({ className }: { className?: string }) {
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
-              className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center teal-glow-sm"
+              className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#4A9A6E] to-[#4A9A6E]/70 flex items-center justify-center sage-glow-sm"
             >
               <TrendingUp className="w-6 h-6 text-white" />
             </motion.div>
@@ -242,12 +242,12 @@ export function PremiumSidebar({ className }: { className?: string }) {
             exit={{ opacity: 0, y: -10 }}
             className="px-6 mb-4 overflow-hidden"
           >
-            <p className="text-[11px] text-sidebar-foreground/40 font-medium">
+            <p className="text-[11px] text-[#64748B] font-medium">
               {greeting}, {user?.name?.split(' ')[0]} 👋
             </p>
-            <div className="mt-3 p-3 rounded-xl bg-primary/5 border border-primary/10 flex items-start gap-2 group cursor-pointer hover:bg-primary/10 transition-colors">
-              <Sparkles className="w-3.5 h-3.5 text-primary mt-0.5" />
-              <p className="text-[10px] text-primary/80 font-medium leading-tight">
+            <div className="mt-3 p-3 rounded-xl bg-[#4A9A6E]/5 border border-[#4A9A6E]/10 flex items-start gap-2 group cursor-pointer hover:bg-[#4A9A6E]/10 transition-colors">
+              <Sparkles className="w-3.5 h-3.5 text-[#4A9A6E] mt-0.5" />
+              <p className="text-[10px] text-[#4A9A6E]/80 font-medium leading-tight">
                 Check Insights — unusual spending detected.
               </p>
             </div>
@@ -275,10 +275,10 @@ export function PremiumSidebar({ className }: { className?: string }) {
 
       {/* Live Activity Strip */}
       {!isCollapsed && (
-        <div className="px-6 py-3 overflow-hidden border-t border-white/5">
+        <div className="px-6 py-3 overflow-hidden border-t border-[#4A9A6E]/5">
           <div className="flex items-center gap-2 animate-marquee whitespace-nowrap">
-            <span className="text-[10px] font-bold text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full">+₹7 added</span>
-            <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">Wallet updated</span>
+            <span className="text-[10px] font-bold text-[#10B981] bg-[#10B981]/10 px-2 py-0.5 rounded-full">+₹7 added</span>
+            <span className="text-[10px] font-bold text-[#4A9A6E] bg-[#4A9A6E]/10 px-2 py-0.5 rounded-full">Wealth Sync</span>
           </div>
         </div>
       )}
@@ -314,21 +314,21 @@ export function PremiumSidebar({ className }: { className?: string }) {
           <DropdownMenuContent 
             side="top" 
             align={isCollapsed ? "center" : "start"} 
-            className="w-60 mb-2 bg-[#1e293b] border-white/5 text-white rounded-[1.5rem] p-2 shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-300"
+            className="w-60 mb-2 bg-white border-[#4A9A6E]/10 text-[#1E2937] rounded-[1.5rem] p-2 shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-300"
           >
-            <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-sidebar-foreground/40 px-3 py-2">
-              Account Control
+            <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-[#64748B] px-3 py-2">
+              Wealth Control
             </DropdownMenuLabel>
-            <DropdownMenuItem className="rounded-xl px-3 py-2.5 focus:bg-primary/10 focus:text-primary cursor-pointer gap-3 transition-colors">
+            <DropdownMenuItem className="rounded-xl px-3 py-2.5 focus:bg-[#4A9A6E]/10 focus:text-[#4A9A6E] cursor-pointer gap-3 transition-colors">
               <User className="w-4 h-4" /> View Profile
             </DropdownMenuItem>
-            <DropdownMenuItem className="rounded-xl px-3 py-2.5 focus:bg-primary/10 focus:text-primary cursor-pointer gap-3 transition-colors">
-              <Settings className="w-4 h-4" /> Settings
+            <DropdownMenuItem className="rounded-xl px-3 py-2.5 focus:bg-[#4A9A6E]/10 focus:text-[#4A9A6E] cursor-pointer gap-3 transition-colors">
+              <Settings className="w-4 h-4" /> Portfolio Settings
             </DropdownMenuItem>
-            <DropdownMenuSeparator className="bg-white/5 my-1" />
+            <DropdownMenuSeparator className="bg-[#4A9A6E]/5 my-1" />
             <DropdownMenuItem 
               onClick={logout}
-              className="rounded-xl px-3 py-2.5 text-rose-400 focus:bg-rose-500/10 focus:text-rose-400 cursor-pointer gap-3 transition-colors"
+              className="rounded-xl px-3 py-2.5 text-rose-500 focus:bg-rose-500/10 focus:text-rose-500 cursor-pointer gap-3 transition-colors"
             >
               <LogOut className="w-4 h-4" /> Sign Out
             </DropdownMenuItem>

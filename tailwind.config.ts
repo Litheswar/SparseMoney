@@ -71,6 +71,9 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        sage: "#4A9A6E",
+        gold: "#D4A017",
+        indigoAccent: "#5B21B6",
       },
       borderRadius: {
         lg: "var(--radius)",
