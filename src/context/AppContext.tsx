@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
-import { Transaction, WalletState, Rule, generateTransaction, addToWallet, triggerInvestment, calculateRoundUp, DEFAULT_RULES, MOCK_PORTFOLIO, Investment } from '@/lib/engine';
+import { api } from '@/lib/api';
 
 interface Notification {
   id: string;
@@ -8,90 +8,135 @@ interface Notification {
   timestamp: Date;
 }
 
-interface AppState {
+interface WalletState {
+  balance: number;
+  threshold: number;
+  totalSaved: number;
+  totalInvested: number;
+}
+
+interface Transaction {
+  id: string;
+  merchant: string;
+  category: string;
+  amount: number;
+  roundUp: number;
+  icon: string;
+  timestamp: Date;
+}
+
+interface AppContextType {
   wallet: WalletState;
   transactions: Transaction[];
-  rules: Rule[];
-  portfolio: Investment[];
   notifications: Notification[];
   weeklySpare: number;
   growthPercent: number;
-}
-
-interface AppContextType extends AppState {
-  simulateTransaction: () => Transaction;
-  toggleRule: (id: string) => void;
-  clearNotification: (id: string) => void;
+  simulateTransaction: () => Promise<Transaction | null>;
   isStreaming: boolean;
   setIsStreaming: (v: boolean) => void;
   lastInvestment: { amount: number; timestamp: Date } | null;
+  loading: boolean;
+  refreshDashboard: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
 
-const INITIAL_WALLET: WalletState = {
-  balance: 187,
-  threshold: 500,
-  totalSaved: 3420,
-  totalInvested: 9400,
-};
-
-// Generate initial transactions
-function generateInitialTransactions(count: number): Transaction[] {
-  const txs: Transaction[] = [];
-  for (let i = 0; i < count; i++) {
-    const tx = generateTransaction();
-    tx.timestamp = new Date(Date.now() - (count - i) * 3600000);
-    txs.push(tx);
-  }
-  return txs;
-}
-
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [wallet, setWallet] = useState<WalletState>(INITIAL_WALLET);
-  const [transactions, setTransactions] = useState<Transaction[]>(() => generateInitialTransactions(20));
-  const [rules, setRules] = useState<Rule[]>(DEFAULT_RULES);
-  const [portfolio] = useState<Investment[]>(MOCK_PORTFOLIO);
+  const [wallet, setWallet] = useState<WalletState>({ balance: 0, threshold: 500, totalSaved: 0, totalInvested: 0 });
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [weeklySpare, setWeeklySpare] = useState(0);
+  const [growthPercent, setGrowthPercent] = useState(0);
   const [isStreaming, setIsStreaming] = useState(false);
   const [lastInvestment, setLastInvestment] = useState<{ amount: number; timestamp: Date } | null>(null);
+  const [loading, setLoading] = useState(true);
   const streamRef = useRef<ReturnType<typeof setInterval>>();
 
-  const addNotification = useCallback((message: string, type: Notification['type'] = 'info') => {
-    setNotifications(prev => [{
-      id: `n-${Date.now()}`,
-      message,
-      type,
-      timestamp: new Date(),
-    }, ...prev].slice(0, 20));
-  }, []);
-
-  const simulateTransaction = useCallback(() => {
-    const tx = generateTransaction();
-    setTransactions(prev => [tx, ...prev]);
-
-    // Round up to wallet
-    const newWallet = addToWallet(wallet, tx.roundUp);
-    setWallet(newWallet);
-    addNotification(`+₹${tx.roundUp} spare from ${tx.merchant}`, 'success');
-
-    // Check threshold
-    const result = triggerInvestment(newWallet);
-    if (result.invested) {
-      setWallet(result.wallet);
-      setLastInvestment({ amount: result.amount, timestamp: new Date() });
-      addNotification(`🎉 ₹${result.amount} auto-invested!`, 'success');
+  const refreshDashboard = useCallback(async () => {
+    try {
+      const data = await api.dashboard.getSummary();
+      setWallet(data.wallet);
+      setWeeklySpare(data.weeklySpare);
+      setGrowthPercent(data.growthPercent);
+      setTransactions(
+        (data.transactions || []).map((t: any) => ({
+          id: t.id,
+          merchant: t.merchant || 'Unknown',
+          category: t.category || 'Other',
+          amount: Number(t.amount),
+          roundUp: Number(t.spare || 0),
+          icon: t.icon || '💳',
+          timestamp: new Date(t.created_at),
+        }))
+      );
+      setNotifications(
+        (data.notifications || []).map((n: any) => ({
+          id: n.id,
+          message: n.message,
+          type: n.type === 'ROUNDUP' ? 'success' : n.type === 'ALERT' ? 'warning' : 'info',
+          timestamp: new Date(n.created_at),
+        }))
+      );
+    } catch (err) {
+      console.error('Dashboard refresh error:', err);
+    } finally {
+      setLoading(false);
     }
-
-    return tx;
-  }, [wallet, addNotification]);
-
-  const toggleRule = useCallback((id: string) => {
-    setRules(prev => prev.map(r => r.id === id ? { ...r, enabled: !r.enabled } : r));
   }, []);
 
-  const clearNotification = useCallback((id: string) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
+  // Load dashboard on mount
+  useEffect(() => {
+    refreshDashboard();
+  }, [refreshDashboard]);
+
+  const simulateTransaction = useCallback(async () => {
+    try {
+      const result = await api.transactions.simulate();
+      const tx: Transaction = {
+        id: result.transaction.id,
+        merchant: result.transaction.merchant || 'Unknown',
+        category: result.transaction.category || 'Other',
+        amount: Number(result.transaction.amount),
+        roundUp: Number(result.transaction.spare || 0),
+        icon: result.transaction.icon || '💳',
+        timestamp: new Date(result.transaction.created_at),
+      };
+
+      setTransactions(prev => [tx, ...prev].slice(0, 50));
+
+      if (result.wallet) {
+        // Refresh full wallet state
+        try {
+          const walletData = await api.wallet.get();
+          setWallet(walletData);
+        } catch {
+          setWallet(prev => ({ ...prev, balance: Number(result.wallet.balance) }));
+        }
+      }
+
+      if (result.investment?.invested) {
+        setLastInvestment({ amount: result.investment.amount, timestamp: new Date() });
+        setTimeout(() => setLastInvestment(null), 5000);
+      }
+
+      // Add notifications from simulation
+      if (result.notifications?.length) {
+        setNotifications(prev => [
+          ...result.notifications.map((n: any) => ({
+            id: n.id,
+            message: n.message,
+            type: 'success' as const,
+            timestamp: new Date(n.created_at),
+          })),
+          ...prev,
+        ].slice(0, 20));
+      }
+
+      return tx;
+    } catch (err) {
+      console.error('Simulation error:', err);
+      return null;
+    }
   }, []);
 
   // Streaming mode
@@ -106,19 +151,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(streamRef.current);
   }, [isStreaming, simulateTransaction]);
 
-  const weeklySpare = transactions
-    .filter(t => t.timestamp > new Date(Date.now() - 7 * 86400000))
-    .reduce((sum, t) => sum + t.roundUp, 0);
-
-  const growthPercent = wallet.totalInvested > 0
-    ? Math.round((portfolio.reduce((s, p) => s + p.amount * p.returns / 100, 0) / wallet.totalInvested) * 100) / 10
-    : 0;
-
   return (
     <AppContext.Provider value={{
-      wallet, transactions, rules, portfolio, notifications,
+      wallet, transactions, notifications,
       weeklySpare, growthPercent, isStreaming, setIsStreaming,
-      simulateTransaction, toggleRule, clearNotification, lastInvestment,
+      simulateTransaction, lastInvestment, loading, refreshDashboard,
     }}>
       {children}
     </AppContext.Provider>

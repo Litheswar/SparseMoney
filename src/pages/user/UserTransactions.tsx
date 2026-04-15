@@ -1,23 +1,61 @@
-import { useApp } from '@/context/AppContext';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Filter, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, Filter, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { api } from '@/lib/api';
+
+interface Transaction {
+  id: string;
+  merchant: string;
+  category: string;
+  amount: number;
+  spare: number;
+  rounded_amount: number;
+  icon: string;
+  created_at: string;
+}
 
 export default function UserTransactions() {
-  const { transactions } = useApp();
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const categories = ['all', ...new Set(transactions.map(t => t.category))];
+  useEffect(() => {
+    async function load() {
+      try {
+        const [txResult, cats] = await Promise.all([
+          api.transactions.list({ limit: 100 }),
+          api.transactions.categories(),
+        ]);
+        setTransactions(txResult.transactions || []);
+        setCategories(cats || []);
+      } catch (err) {
+        console.error('Load transactions error:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
 
+  // Client-side search filter (server-side also works but instant is better UX)
   const filtered = transactions.filter(t => {
-    if (search && !t.merchant.toLowerCase().includes(search.toLowerCase())) return false;
+    if (search && !(t.merchant || '').toLowerCase().includes(search.toLowerCase())) return false;
     if (category !== 'all' && t.category !== category) return false;
     return true;
   });
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -43,8 +81,9 @@ export default function UserTransactions() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
             {categories.map(c => (
-              <SelectItem key={c} value={c}>{c === 'all' ? 'All Categories' : c}</SelectItem>
+              <SelectItem key={c} value={c}>{c}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -52,55 +91,59 @@ export default function UserTransactions() {
 
       {/* Transaction List */}
       <div className="glass-card divide-y divide-border">
-        {filtered.map((tx, i) => (
-          <motion.div
-            key={tx.id}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: i * 0.02 }}
-          >
-            <button
-              onClick={() => setExpandedId(expandedId === tx.id ? null : tx.id)}
-              className="w-full flex items-center gap-3 p-4 hover:bg-muted/30 transition-colors text-left"
+        {filtered.map((tx, i) => {
+          const spare = Number(tx.spare || 0);
+          const amount = Number(tx.amount);
+          return (
+            <motion.div
+              key={tx.id}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: i * 0.02 }}
             >
-              <span className="text-xl">{tx.icon}</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground">{tx.merchant}</p>
-                <p className="text-xs text-muted-foreground">
-                  {tx.timestamp.toLocaleDateString()} · {tx.category}
-                </p>
-              </div>
-              <div className="text-right mr-2">
-                <p className="text-sm font-semibold text-foreground">₹{tx.amount}</p>
-                <p className="text-xs text-success">+₹{tx.roundUp}</p>
-              </div>
-              {expandedId === tx.id ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
-            </button>
-            <AnimatePresence>
-              {expandedId === tx.id && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="overflow-hidden"
-                >
-                  <div className="px-4 pb-4 pt-0">
-                    <div className="bg-muted/30 rounded-xl p-4">
-                      <p className="text-sm font-medium text-foreground mb-2">Round-Up Breakdown</p>
-                      <div className="flex items-center gap-3 text-sm">
-                        <span className="bg-muted px-3 py-1.5 rounded-lg text-foreground">₹{tx.amount}</span>
-                        <span className="text-muted-foreground">→</span>
-                        <span className="bg-muted px-3 py-1.5 rounded-lg text-foreground">₹{tx.amount + tx.roundUp}</span>
-                        <span className="text-muted-foreground">→</span>
-                        <span className="bg-success/10 text-success px-3 py-1.5 rounded-lg font-bold">Spare ₹{tx.roundUp}</span>
+              <button
+                onClick={() => setExpandedId(expandedId === tx.id ? null : tx.id)}
+                className="w-full flex items-center gap-3 p-4 hover:bg-muted/30 transition-colors text-left"
+              >
+                <span className="text-xl">{tx.icon || '💳'}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground">{tx.merchant || 'Unknown'}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(tx.created_at).toLocaleDateString()} · {tx.category}
+                  </p>
+                </div>
+                <div className="text-right mr-2">
+                  <p className="text-sm font-semibold text-foreground">₹{amount}</p>
+                  <p className="text-xs text-success">+₹{spare}</p>
+                </div>
+                {expandedId === tx.id ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+              </button>
+              <AnimatePresence>
+                {expandedId === tx.id && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="px-4 pb-4 pt-0">
+                      <div className="bg-muted/30 rounded-xl p-4">
+                        <p className="text-sm font-medium text-foreground mb-2">Round-Up Breakdown</p>
+                        <div className="flex items-center gap-3 text-sm">
+                          <span className="bg-muted px-3 py-1.5 rounded-lg text-foreground">₹{amount}</span>
+                          <span className="text-muted-foreground">→</span>
+                          <span className="bg-muted px-3 py-1.5 rounded-lg text-foreground">₹{amount + spare}</span>
+                          <span className="text-muted-foreground">→</span>
+                          <span className="bg-success/10 text-success px-3 py-1.5 rounded-lg font-bold">Spare ₹{spare}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
-        ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          );
+        })}
         {filtered.length === 0 && (
           <p className="text-center text-muted-foreground py-12">No transactions found</p>
         )}

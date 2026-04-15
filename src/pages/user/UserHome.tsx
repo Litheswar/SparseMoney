@@ -1,6 +1,6 @@
 import { useApp } from '@/context/AppContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { TrendingUp, Wallet, Coins, ArrowUpRight, Zap, Bell, Play, Pause } from 'lucide-react';
+import { TrendingUp, Wallet, Coins, ArrowUpRight, Zap, Bell, Play, Pause, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useEffect, useState } from 'react';
@@ -24,7 +24,14 @@ function CountUp({ value, prefix = '₹' }: { value: number; prefix?: string }) 
 }
 
 export default function UserHome() {
-  const { wallet, transactions, weeklySpare, growthPercent, simulateTransaction, isStreaming, setIsStreaming, notifications, lastInvestment } = useApp();
+  const { wallet, transactions, weeklySpare, growthPercent, simulateTransaction, isStreaming, setIsStreaming, notifications, lastInvestment, loading } = useApp();
+  const [simulating, setSimulating] = useState(false);
+
+  const handleSimulate = async () => {
+    setSimulating(true);
+    await simulateTransaction();
+    setSimulating(false);
+  };
 
   const kpis = [
     { label: 'Total Saved', value: wallet.totalSaved, icon: Coins, gradient: 'gradient-primary' },
@@ -32,6 +39,14 @@ export default function UserHome() {
     { label: 'Weekly Spare', value: weeklySpare, icon: Wallet, gradient: 'gradient-primary' },
     { label: 'Growth', value: growthPercent, icon: ArrowUpRight, prefix: '', suffix: '%', gradient: 'gradient-success' },
   ];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -61,8 +76,9 @@ export default function UserHome() {
 
       {/* Demo Controls */}
       <div className="flex flex-wrap gap-3">
-        <Button onClick={simulateTransaction} className="rounded-xl gradient-primary text-primary-foreground">
-          <Zap className="w-4 h-4 mr-2" /> Simulate Transaction
+        <Button onClick={handleSimulate} disabled={simulating} className="rounded-xl gradient-primary text-primary-foreground">
+          {simulating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Zap className="w-4 h-4 mr-2" />}
+          Simulate Transaction
         </Button>
         <Button
           variant={isStreaming ? 'destructive' : 'outline'}
@@ -100,6 +116,9 @@ export default function UserHome() {
                 </motion.div>
               ))}
             </AnimatePresence>
+            {transactions.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-8">No transactions yet. Click "Simulate Transaction" to start!</p>
+            )}
           </div>
         </div>
 
@@ -114,7 +133,7 @@ export default function UserHome() {
               </p>
               <p className="text-xs text-muted-foreground">of ₹{wallet.threshold} threshold</p>
             </div>
-            <Progress value={(wallet.balance / wallet.threshold) * 100} className="h-3 rounded-full" />
+            <Progress value={wallet.threshold > 0 ? (wallet.balance / wallet.threshold) * 100 : 0} className="h-3 rounded-full" />
             <p className="text-xs text-muted-foreground mt-2 text-center">
               ₹{Math.max(0, wallet.threshold - wallet.balance)} to auto-invest
             </p>
@@ -139,6 +158,7 @@ export default function UserHome() {
                 </motion.span>
               </div>
             ))}
+            {transactions.length === 0 && <p className="text-xs text-muted-foreground">No round-ups yet</p>}
           </div>
 
           {/* Notifications */}

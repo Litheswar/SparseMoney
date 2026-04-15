@@ -127,7 +127,7 @@ export default function OnboardingPage() {
   };
 
   const handleComplete = () => {
-    completeOnboarding(selectedBankInfo?.short || 'BANK');
+    completeOnboarding(selectedBankInfo?.short || 'BANK', phoneNumber || undefined);
   };
 
   const cardMotion = {

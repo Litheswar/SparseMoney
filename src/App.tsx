@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { AppProvider } from "@/context/AppContext";
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
+import SignupPage from "./pages/SignupPage";
 import OnboardingPage from "./pages/OnboardingPage";
 import DashboardLayout from "./components/DashboardLayout";
 import UserHome from "./pages/user/UserHome";
@@ -29,14 +30,30 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center animate-pulse">
+          <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+        </div>
+        <p className="text-sm text-muted-foreground font-medium">Loading SpareSmart...</p>
+      </div>
+    </div>
+  );
+}
+
 function AppRoutes() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, loading } = useAuth();
+
+  if (loading) return <LoadingScreen />;
 
   if (!isAuthenticated) {
     return (
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     );
@@ -68,19 +85,21 @@ function AppRoutes() {
     );
   }
 
-  // User routes
+  // User routes — wrapped in AppProvider for dashboard data
   return (
-    <Routes>
-      <Route path="/dashboard" element={<DashboardLayout><UserHome /></DashboardLayout>} />
-      <Route path="/dashboard/transactions" element={<DashboardLayout><UserTransactions /></DashboardLayout>} />
-      <Route path="/dashboard/wallet" element={<DashboardLayout><UserWallet /></DashboardLayout>} />
-      <Route path="/dashboard/insights" element={<DashboardLayout><UserInsights /></DashboardLayout>} />
-      <Route path="/dashboard/rules" element={<DashboardLayout><UserRules /></DashboardLayout>} />
-      <Route path="/dashboard/horizon" element={<DashboardLayout><UserHorizon /></DashboardLayout>} />
-      <Route path="/dashboard/groups" element={<DashboardLayout><UserGroups /></DashboardLayout>} />
-      <Route path="/dashboard/profile" element={<DashboardLayout><UserProfile /></DashboardLayout>} />
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
-    </Routes>
+    <AppProvider>
+      <Routes>
+        <Route path="/dashboard" element={<DashboardLayout><UserHome /></DashboardLayout>} />
+        <Route path="/dashboard/transactions" element={<DashboardLayout><UserTransactions /></DashboardLayout>} />
+        <Route path="/dashboard/wallet" element={<DashboardLayout><UserWallet /></DashboardLayout>} />
+        <Route path="/dashboard/insights" element={<DashboardLayout><UserInsights /></DashboardLayout>} />
+        <Route path="/dashboard/rules" element={<DashboardLayout><UserRules /></DashboardLayout>} />
+        <Route path="/dashboard/horizon" element={<DashboardLayout><UserHorizon /></DashboardLayout>} />
+        <Route path="/dashboard/groups" element={<DashboardLayout><UserGroups /></DashboardLayout>} />
+        <Route path="/dashboard/profile" element={<DashboardLayout><UserProfile /></DashboardLayout>} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </AppProvider>
   );
 }
 
@@ -90,11 +109,9 @@ const App = () => (
       <Toaster />
       <Sonner />
       <AuthProvider>
-        <AppProvider>
-          <BrowserRouter>
-            <AppRoutes />
-          </BrowserRouter>
-        </AppProvider>
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
