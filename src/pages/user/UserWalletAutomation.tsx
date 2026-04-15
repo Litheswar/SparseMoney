@@ -1,30 +1,26 @@
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowUpRight, PieChart, ShieldCheck, TrendingUp, Wallet, Workflow, Loader2 } from 'lucide-react';
+import { ArrowUpRight, PieChart, ShieldCheck, TrendingUp, Wallet, Workflow } from 'lucide-react';
 import { PieChart as RPieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { useApp } from '@/context/AppContext';
 import { Progress } from '@/components/ui/progress';
+import { formatCurrency } from '@/lib/automation';
 
-export default function UserWallet() {
-  const { wallet, portfolio, automationStats, destinationBalances, recentExecutions, loading } = useApp();
-  
-  const totalPortfolio = (portfolio || []).reduce((sum, holding) => sum + holding.amount, 0);
+export default function UserWalletAutomation() {
+  const { wallet, portfolio, automationStats, destinationBalances, recentExecutions } = useApp();
+  const totalPortfolio = portfolio.reduce((sum, holding) => sum + holding.amount, 0);
   const netWorth = wallet.balance + totalPortfolio;
-
-  const formatCurrency = (amount: number) => `₹${Math.round(amount).toLocaleString('en-IN')}`;
 
   const topDestinations = useMemo(
     () =>
-      Object.entries(destinationBalances || {})
+      Object.entries(destinationBalances)
         .sort((left, right) => right[1] - left[1])
         .slice(0, 4),
     [destinationBalances],
   );
 
-  if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
-
   return (
-    <div className="max-w-6xl mx-auto space-y-6 pb-20">
+    <div className="max-w-6xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold font-heading text-foreground">Wallet & Investments</h1>
         <p className="text-sm text-muted-foreground">Track your spare wallet, portfolio, and automation cashflows.</p>
@@ -37,7 +33,7 @@ export default function UserWallet() {
             <span className="text-xs text-muted-foreground">Wallet Balance</span>
           </div>
           <p className="text-2xl font-bold font-heading text-foreground">{formatCurrency(wallet.balance)}</p>
-          <Progress value={(wallet.balance / (wallet.threshold || 1)) * 100} className="mt-2 h-2 rounded-full" />
+          <Progress value={(wallet.balance / wallet.threshold) * 100} className="mt-2 h-2 rounded-full" />
           <p className="mt-1 text-xs text-muted-foreground">Auto-invest at {formatCurrency(wallet.threshold)}</p>
         </motion.div>
 
@@ -70,7 +66,7 @@ export default function UserWallet() {
             <span className="text-xs text-muted-foreground">Net Worth</span>
           </div>
           <p className="text-2xl font-bold font-heading text-foreground">{formatCurrency(netWorth)}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Top destination: {automationStats.topDestination}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Top automation destination: {automationStats.topDestination}</p>
         </motion.div>
       </div>
 
@@ -107,7 +103,7 @@ export default function UserWallet() {
                     <p className="text-sm font-medium text-foreground">{destination}</p>
                     <p className="text-xs text-muted-foreground">Routed by active automations</p>
                   </div>
-                  <p className="text-sm font-semibold text-foreground">{formatCurrency(amount as number)}</p>
+                  <p className="text-sm font-semibold text-foreground">{formatCurrency(amount)}</p>
                 </div>
               </motion.div>
             ))}
@@ -147,7 +143,7 @@ export default function UserWallet() {
             <h3 className="text-base font-semibold font-heading text-foreground">Recent Automation Deposits</h3>
           </div>
           <div className="space-y-3">
-            {(recentExecutions || []).slice(0, 5).map((execution) => (
+            {recentExecutions.slice(0, 5).map((execution) => (
               <div key={execution.id} className="rounded-xl border border-border/60 bg-white/60 p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
