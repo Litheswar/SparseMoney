@@ -181,10 +181,10 @@ export const DESTINATION_OPTIONS: RuleDestination[] = [
 export const MERCHANT_OPTIONS = MERCHANTS.map((merchant) => merchant.name);
 
 export const MOCK_PORTFOLIO: Investment[] = [
-  { name: 'Nippon Gold ETF', type: 'Gold ETF', amount: 2400, returns: 12.5, color: 'hsl(45 93% 47%)' },
-  { name: 'Nifty 50 Index', type: 'Index Fund', amount: 4200, returns: 15.2, color: 'hsl(174 62% 40%)' },
-  { name: 'HDFC Debt Fund', type: 'Debt Fund', amount: 1800, returns: 7.8, color: 'hsl(220 70% 50%)' },
-  { name: 'SBI FD (1yr)', type: 'Fixed Deposit', amount: 1000, returns: 6.5, color: 'hsl(280 60% 50%)' },
+  { name: 'Nippon Gold ETF', type: 'Gold ETF', amount: 2400, returns: 12.5, color: '#D4A017' },
+  { name: 'Nifty 50 Index', type: 'Index Fund', amount: 4200, returns: 15.2, color: '#4A9A6E' },
+  { name: 'HDFC Debt Fund', type: 'Debt Fund', amount: 1800, returns: 7.8, color: '#5B21B6' },
+  { name: 'SBI FD (1yr)', type: 'Fixed Deposit', amount: 1000, returns: 6.5, color: '#64748B' },
 ];
 
 export const DEFAULT_DESTINATION_BALANCES: Record<RuleDestination, number> = {
@@ -197,12 +197,12 @@ export const DEFAULT_DESTINATION_BALANCES: Record<RuleDestination, number> = {
 };
 
 export const SPENDING_CATEGORIES = [
-  { name: 'Food', amount: 4200, color: 'hsl(0 72% 55%)', percentage: 35 },
-  { name: 'Transport', amount: 1800, color: 'hsl(38 92% 50%)', percentage: 15 },
-  { name: 'Shopping', amount: 3600, color: 'hsl(174 62% 40%)', percentage: 30 },
-  { name: 'Entertainment', amount: 1200, color: 'hsl(280 60% 50%)', percentage: 10 },
-  { name: 'Groceries', amount: 800, color: 'hsl(152 60% 42%)', percentage: 7 },
-  { name: 'Health', amount: 400, color: 'hsl(220 70% 50%)', percentage: 3 },
+  { name: 'Food', amount: 4200, color: '#EF4444', percentage: 35 },
+  { name: 'Transport', amount: 1800, color: '#F59E0B', percentage: 15 },
+  { name: 'Shopping', amount: 3600, color: '#4A9A6E', percentage: 30 },
+  { name: 'Entertainment', amount: 1200, color: '#5B21B6', percentage: 10 },
+  { name: 'Groceries', amount: 800, color: '#10B981', percentage: 7 },
+  { name: 'Health', amount: 400, color: '#6366F1', percentage: 3 },
 ];
 
 let txCounter = 0;

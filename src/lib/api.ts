@@ -125,4 +125,11 @@ export const api = {
     updateSettings: (settings: Record<string, unknown>) =>
       apiFetch('/profile/settings', { method: 'PATCH', body: JSON.stringify(settings) }),
   },
+
+  // === MARKET DATA ===
+  market: {
+    prices: () => apiFetch('/market/prices'),
+    portfolio: () => apiFetch('/market/portfolio'),
+    history: () => apiFetch('/market/history'),
+  },
 };

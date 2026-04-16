@@ -15,6 +15,9 @@ import groupRoutes from './routes/group.routes.js';
 import notificationRoutes from './routes/notification.routes.js';
 import insightRoutes from './routes/insight.routes.js';
 import profileRoutes from './routes/profile.routes.js';
+import marketRoutes from './routes/market.routes.js';
+import historyRoutes from './routes/history.routes.js';
+import { startPriceUpdater } from './engines/priceUpdater.js';
 
 const app = express();
 
@@ -45,6 +48,7 @@ app.use('/api/groups', groupRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/insights', insightRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/market', marketRoutes);
 
 // === 404 HANDLER ===
 app.use((_req, res) => {
@@ -66,6 +70,9 @@ app.listen(PORT, () => {
   logger.info(`🚀 SpareSmart API running on http://localhost:${PORT}`);
   logger.info(`   Environment: ${env.NODE_ENV}`);
   logger.info(`   CORS origin: ${env.CORS_ORIGIN}`);
+
+  // Start the market data cron job after server is listening
+  startPriceUpdater();
 });
 
 export default app;

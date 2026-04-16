@@ -37,13 +37,20 @@ export async function getTotalSaved(userId: string): Promise<number> {
   return (data || []).reduce((s, t) => s + Number(t.spare || 0), 0);
 }
 
-/** Compute total_invested = sum of all investments */
+/** Compute total_invested = sum of all holdings */
 export async function getTotalInvested(userId: string): Promise<number> {
-  const { data } = await supabase
-    .from('investments')
+  const { data, error } = await supabase
+    .from('holdings')
     .select('amount')
     .eq('user_id', userId);
-  return (data || []).reduce((s, t) => s + Number(t.amount || 0), 0);
+    
+  if (error) {
+    logger.error(`[Wallet] Failed to fetch total invested for ${userId}:`, error);
+    return 0;
+  }
+  
+  const total = (data || []).reduce((s, t) => s + Number(t.amount || 0), 0);
+  return total;
 }
 
 export async function addToWallet(userId: string, spare: number) {

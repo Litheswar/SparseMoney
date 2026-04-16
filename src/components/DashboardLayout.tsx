@@ -62,14 +62,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               variant="ghost"
               size="icon"
               onClick={() => setIsNotificationsOpen(true)}
-              className="relative rounded-2xl hover:bg-white/5 transition-all group w-10 h-10 border border-white/5"
+              className="relative rounded-2xl hover:bg-[#4A9A6E]/5 transition-all group w-10 h-10 border border-[#4A9A6E]/10"
             >
               <Bell className="w-5 h-5 text-foreground group-hover:text-primary transition-colors" />
               {unreadCount > 0 && (
                 <motion.span 
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
-                  className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-rose-500 text-[10px] font-bold text-white flex items-center justify-center border-2 border-background shadow-lg"
+                  className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-[#D4A017] text-[10px] font-bold text-white flex items-center justify-center border-2 border-background shadow-lg"
                 >
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </motion.span>
@@ -85,8 +85,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         
         <main className="flex-1 px-4 lg:px-12 py-8 relative">
           {/* Subtle Background Elements */}
-          <div className="absolute top-[-10%] right-[-5%] w-[600px] h-[600px] bg-primary/10 rounded-full blur-[160px] -z-10 pointer-events-none animate-pulse-slow" />
-          <div className="absolute bottom-[-10%] left-[-5%] w-[400px] h-[400px] bg-blue-500/10 rounded-full blur-[140px] -z-10 pointer-events-none" />
+          <div className="absolute top-[-10%] right-[-5%] w-[600px] h-[600px] bg-[#4A9A6E]/5 rounded-full blur-[160px] -z-10 pointer-events-none animate-pulse-slow" />
+          <div className="absolute bottom-[-10%] left-[-5%] w-[400px] h-[400px] bg-[#5B21B6]/5 rounded-full blur-[140px] -z-10 pointer-events-none" />
 
           <AnimatePresence mode="wait">
             <motion.div
