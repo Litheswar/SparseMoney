@@ -16,15 +16,22 @@ export async function getWallet(userId: string) {
 
   if (error && error.code === 'PGRST116') {
     // No wallet exists, create one
+    console.log(`[DB Info] Creating wallet for ${userId}`);
     const { data: newWallet, error: createErr } = await supabase
       .from('wallet')
       .insert({ user_id: userId, balance: 0 })
       .select()
       .single();
-    if (createErr) throw createErr;
+    if (createErr) {
+      console.error(`[DB Error] Failed to create wallet for ${userId}:`, createErr);
+      throw new Error(createErr.message);
+    }
     return newWallet;
   }
-  if (error) throw error;
+  if (error) {
+    console.error(`[DB Error] getWallet for ${userId}:`, error);
+    throw new Error(error.message);
+  }
   return data;
 }
 
@@ -67,7 +74,10 @@ export async function addToWallet(userId: string, spare: number) {
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error(`[DB Error] addToWallet for ${userId}:`, error);
+    throw new Error(error.message);
+  }
   logger.info(`Wallet updated for ${userId}: +₹${spare}, balance=₹${newBalance}`);
   return data;
 }
@@ -86,7 +96,10 @@ export async function deductFromWallet(userId: string, amount: number) {
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error(`[DB Error] deductFromWallet for ${userId}:`, error);
+    throw new Error(error.message);
+  }
   logger.info(`Wallet deducted for ${userId}: -₹${amount}, balance=₹${newBalance}`);
   return data;
 }

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, Loader2, LockKeyhole, WalletCards } from 'lucide-react';
+import BrandLogo from '@/components/BrandLogo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/context/AuthContext';
@@ -40,18 +41,12 @@ export default function LoginPage() {
         className="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-md flex-col justify-center"
       >
         <div className="mb-8 text-center">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.45 }}
-            className="mb-4 inline-flex items-center gap-3"
-          >
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg gradient-primary shadow-xl shadow-primary/20 animate-pulse-glow">
-              <WalletCards className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <h1 className="font-heading text-3xl font-bold text-gradient">SpareSmart</h1>
-          </motion.div>
-          <p className="text-muted-foreground">Turn your daily spending into intelligent investments</p>
+          <BrandLogo 
+            size={48} 
+            withGlow 
+            tagline="Intelligent Micro-Investment Platform"
+            className="flex-col items-center gap-4"
+          />
         </div>
 
         <motion.div

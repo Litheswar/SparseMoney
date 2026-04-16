@@ -3,8 +3,13 @@ import {
   Wallet, Bell, Shield, Calculator, TrendingUp, 
   Users, Zap, Lock, CreditCard, Activity,
   ChevronRight, ArrowUpRight, CheckCircle2, Check,
-  Target, Award, Fingerprint, Star, Flame, Trophy, Info
+  Target, Award, Fingerprint, Star, Flame, Trophy, Info,
+  LogOut, Settings as SettingsIcon
 } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+import { useApp } from '@/context/AppContext';
+import BrandLogo from '@/components/BrandLogo';
+import { Button } from '@/components/ui/button';
 
 /**
  * ProfileSettings Component
@@ -12,14 +17,17 @@ import {
  * Features: Proportional Asset Balancing, Saving Streaks, and AI Insights.
  */
 export default function ProfileSettings() {
-  // --- Profile State ---
-  const [user] = useState({
-    name: "Alex Thompson",
-    bank: "HDFC Bank",
+  const { user, logout } = useAuth();
+  const { wallet } = useApp();
+
+  // --- Profile State (Derived from Auth) ---
+  const userData = {
+    name: user?.name || "Alex Thompson",
+    bank: "HDFC Bank", // This should ideally be from onboarding/bank state
     account: "XXXX-9941",
-    assets: 125400,
+    assets: wallet.totalSaved || 125400,
     memberSince: "March 2024"
-  });
+  };
 
   // --- Settings State ---
   const [roundUpEnabled, setRoundUpEnabled] = useState(true);
@@ -145,19 +153,19 @@ export default function ProfileSettings() {
                 </div>
                 <div className="flex-1 text-center md:text-left">
                   <div className="flex items-center justify-center md:justify-start gap-2 mb-1">
-                    <h2 className="text-3xl font-black tracking-tight">{user.name}</h2>
+                    <h2 className="text-3xl font-black tracking-tight">{userData.name}</h2>
                     <div className="p-1 rounded-full bg-blue-500 text-white shadow-sm ring-4 ring-blue-500/10">
                       <Check size={12} strokeWidth={4} />
                     </div>
                   </div>
                   <div className="flex flex-wrap justify-center md:justify-start gap-4 text-xs font-bold text-slate-400 mt-2 uppercase tracking-wide">
-                    <span className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-xl"><CreditCard size={14} /> {user.bank} {user.account}</span>
-                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-100">{user.memberSince}</span>
+                    <span className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-xl"><CreditCard size={14} /> {userData.bank} {userData.account}</span>
+                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-100">{userData.memberSince}</span>
                   </div>
                 </div>
                 <div className="bg-emerald-50 rounded-3xl p-6 min-w-[220px]">
                   <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1 opacity-70">Total Assets</p>
-                  <p className="text-3xl font-black tracking-tight">₹{user.assets.toLocaleString()}</p>
+                  <p className="text-3xl font-black tracking-tight">₹{userData.assets.toLocaleString()}</p>
                   <div className="mt-2 flex items-center gap-1.5 text-emerald-600 text-[10px] font-bold">
                     <ArrowUpRight size={12} /> +12.4% this month
                   </div>

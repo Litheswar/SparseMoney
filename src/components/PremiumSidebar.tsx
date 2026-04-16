@@ -1,3 +1,4 @@
+import BrandLogo from './BrandLogo';
 import React, { useState, useEffect } from 'react';
 import { NavLink as RRNavLink, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -166,6 +167,12 @@ export function PremiumSidebar({ className }: { className?: string }) {
     else setGreeting('Good Evening');
   }, []);
 
+  const getLogoContext = () => {
+    if (location.pathname.includes('wallet')) return 'wealth';
+    if (location.pathname.includes('insights')) return 'intel';
+    return 'sage';
+  };
+
   return (
     <motion.aside
       initial={false}
@@ -180,39 +187,17 @@ export function PremiumSidebar({ className }: { className?: string }) {
         "p-6 flex items-center h-20",
         isCollapsed ? "justify-center" : "justify-between"
       )}>
-        <AnimatePresence mode="popLayout">
-          {!isCollapsed ? (
-            <motion.div
-              key="expanded-logo"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              className="flex items-center gap-3"
-            >
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#4A9A6E] to-[#4A9A6E]/70 flex items-center justify-center sage-glow-md">
-                <TrendingUp className="w-6 h-6 text-white" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-xl font-black font-heading text-[#1E2937] tracking-tight">
-                  SpareSmart
-                </span>
-                <span className="text-[10px] font-bold text-[#4A9A6E] tracking-[0.2em] uppercase leading-none mt-1">
-                  Wealth
-                </span>
-              </div>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="collapsed-logo"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#4A9A6E] to-[#4A9A6E]/70 flex items-center justify-center sage-glow-sm"
-            >
-              <TrendingUp className="w-6 h-6 text-white" />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <BrandLogo 
+          size={isCollapsed ? 40 : 36}
+          hideText={isCollapsed}
+          withGlow
+          tagline="Fintech Intelligence"
+          context={getLogoContext()}
+          pulse={!!useApp().lastInvestment}
+          className="sidebar-brand-animation"
+        />
+
+
         
         {!isCollapsed && (
           <button 
@@ -223,6 +208,7 @@ export function PremiumSidebar({ className }: { className?: string }) {
           </button>
         )}
       </div>
+
 
       {isCollapsed && (
          <button 

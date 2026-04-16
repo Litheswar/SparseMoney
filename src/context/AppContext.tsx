@@ -140,9 +140,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         // For live assets apply daily market change on top of invested amount
         let currentAmount = investedAmount;
         let displayReturns = baseReturns;
-        if (marketData) {
+        if (marketData && marketData.changePercent != null) {
           currentAmount  = investedAmount * (1 + (marketData.changePercent / 100));
-          displayReturns = baseReturns; // keep long-term return % from DB
         }
 
         return {
@@ -401,7 +400,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     totalRouted:                  wallet.totalSaved,
     activeRules:                  rules.filter(r => r.enabled).length,
     totalTriggers:                rules.reduce((acc, r) => acc + (r.triggerCount || 0), 0),
-    topDestination:               portfolio.length > 0 ? portfolio.sort((a,b) => b.amount - a.amount)[0].name : 'Wallet',
+    topDestination:               portfolio.length > 0 ? [...portfolio].sort((a,b) => b.amount - a.amount)[0].name : 'Wallet',
     projectedMonthlyContribution: weeklySpare * 4 || automationImpact * 1.2 || 0,
     inactiveOpportunity:          rules.filter(r => !r.enabled).length * 150, // Simple estimate: ₹150 per inactive rule
   };

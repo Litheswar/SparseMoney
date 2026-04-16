@@ -17,7 +17,10 @@ export async function getTransactions(userId: string, opts?: { search?: string; 
   if (opts?.offset) query = query.range(opts.offset, opts.offset + (opts.limit || 50) - 1);
 
   const { data, error, count } = await query;
-  if (error) throw error;
+  if (error) {
+    console.error(`[DB Error] getTransactions for ${userId}:`, error);
+    throw new Error(error.message);
+  }
   return { transactions: data || [], total: count || 0 };
 }
 
@@ -27,7 +30,10 @@ export async function getCategories(userId: string): Promise<string[]> {
     .select('category')
     .eq('user_id', userId);
 
-  if (error) throw error;
+  if (error) {
+    console.error(`[DB Error] getCategories for ${userId}:`, error);
+    throw new Error(error.message);
+  }
   const unique = [...new Set((data || []).map(t => t.category).filter(Boolean))];
   return unique;
 }

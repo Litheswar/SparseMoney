@@ -16,6 +16,7 @@ import {
   Shield,
   WalletCards,
 } from 'lucide-react';
+import BrandLogo from '@/components/BrandLogo';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 
@@ -140,7 +141,14 @@ export default function OnboardingPage() {
   return (
     <main className="min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,hsl(174_62%_88%/.72),transparent_35%),linear-gradient(145deg,hsl(180_15%_96%),white_48%,hsl(174_40%_96%))] px-4 py-8 text-foreground">
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-xl flex-col justify-center">
-        <div className="mb-6 text-center">
+        <div className="mb-10 text-center">
+          <BrandLogo 
+            size={48} 
+            withGlow 
+            tagline="Wealth Builder Onboarding" 
+            className="flex-col items-center gap-4 mb-8"
+          />
+
           <motion.div
             initial={{ opacity: 0, y: -12 }}
             animate={{ opacity: 1, y: 0 }}

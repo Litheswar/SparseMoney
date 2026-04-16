@@ -29,9 +29,26 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.use(express.json({ limit: '1mb' }));
+
+// === JSON PARSE ERROR HANDLER ===
+app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (err instanceof SyntaxError && 'status' in err && err.status === 400 && 'body' in err) {
+    return res.status(400).json({ success: false, message: 'Invalid JSON payload' });
+  }
+  next();
+});
+
 app.use(morganMiddleware);
 app.use(sanitize);
 app.use(apiLimiter);
+
+// === DEBUG LOGGING (as requested) ===
+console.log("ENV SUPABASE_URL:", env.SUPABASE_URL);
+
+app.use((req, _res, next) => {
+  console.log(`API HIT: ${req.method} ${req.path}`);
+  next();
+});
 
 // === HEALTH CHECK ===
 app.get('/api/health', (_req, res) => {
@@ -58,9 +75,15 @@ app.use((_req, res) => {
 // === GLOBAL ERROR HANDLER ===
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   logger.error('Unhandled error:', err);
-  res.status(err.status || 500).json({
+  
+  // Ensure we always return JSON, even if err is not a standard Error object
+  const statusCode = err.status || err.statusCode || 500;
+  const message = err.message || (typeof err === 'string' ? err : 'Internal Server Error');
+  
+  res.status(statusCode).json({
     success: false,
-    error: env.NODE_ENV === 'production' ? 'Internal server error' : err.message,
+    message: env.NODE_ENV === 'production' ? 'Internal server error' : message,
+    error: env.NODE_ENV === 'development' ? err : undefined,
   });
 });
 

@@ -7,7 +7,10 @@ export async function getHoldings(userId: string) {
     .eq('user_id', userId)
     .order('amount', { ascending: false });
 
-  if (error) throw error;
+  if (error) {
+    console.error(`[DB Error] getHoldings for ${userId}:`, error);
+    throw new Error(error.message);
+  }
   return data || [];
 }
 
@@ -19,7 +22,10 @@ export async function getInvestments(userId: string, limit = 20) {
     .order('created_at', { ascending: false })
     .limit(limit);
 
-  if (error) throw error;
+  if (error) {
+    console.error(`[DB Error] getInvestments for ${userId}:`, error);
+    throw new Error(error.message);
+  }
   return data || [];
 }
 
@@ -29,7 +35,10 @@ export async function getAllocations(userId: string) {
     .select('*')
     .eq('user_id', userId);
 
-  if (error) throw error;
+  if (error) {
+    console.error(`[DB Error] getAllocations for ${userId}:`, error);
+    throw new Error(error.message);
+  }
 
   // Return defaults if none set
   if (!data || data.length === 0) {

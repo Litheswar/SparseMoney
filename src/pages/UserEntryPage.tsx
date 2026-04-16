@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { BarChart3, LockKeyhole, Sparkles, WalletCards, ArrowRight, UserPlus, LogIn } from 'lucide-react';
+import BrandLogo from '@/components/BrandLogo';
 
 const trustItems = ['256-bit encryption', 'RBI compliant', 'Secure AA framework'];
 
@@ -23,25 +24,12 @@ export default function UserEntryPage() {
         className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-6xl flex-col items-center justify-center gap-10"
       >
         <div className="text-center">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.86 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.55, ease: 'easeOut' }}
-            className="mb-5 inline-flex items-center gap-3"
-          >
-            <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-white/85 shadow-xl shadow-primary/15 ring-1 ring-primary/15 backdrop-blur">
-              <WalletCards className="h-7 w-7 text-primary" />
-            </div>
-            <span className="font-heading text-4xl font-bold tracking-normal text-gradient sm:text-5xl">SpareSmart</span>
-          </motion.div>
-          <motion.p
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.18, duration: 0.5 }}
-            className="mx-auto max-w-2xl text-xl font-medium leading-relaxed text-foreground sm:text-2xl"
-          >
-            Turn your daily spending into intelligent investments
-          </motion.p>
+          <BrandLogo 
+            size={56} 
+            withGlow 
+            tagline="Intelligent Micro-Investment Platform"
+            className="flex-col items-center gap-6"
+          />
         </div>
 
         <motion.div

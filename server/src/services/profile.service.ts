@@ -14,7 +14,10 @@ export async function getProfile(userId: string) {
     .eq('id', userId)
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error(`[DB Error] getProfile for ${userId}:`, error);
+    throw new Error(error.message);
+  }
   return data;
 }
 
@@ -27,15 +30,22 @@ export async function getSettings(userId: string) {
 
   if (error && error.code === 'PGRST116') {
     // Create default settings
+    console.log(`[DB Info] Creating default settings for ${userId}`);
     const { data: newSettings, error: createErr } = await supabase
       .from('user_settings')
       .insert({ user_id: userId })
       .select()
       .single();
-    if (createErr) throw createErr;
+    if (createErr) {
+      console.error(`[DB Error] Failed to create settings for ${userId}:`, createErr);
+      throw new Error(createErr.message);
+    }
     return newSettings;
   }
-  if (error) throw error;
+  if (error) {
+    console.error(`[DB Error] getSettings for ${userId}:`, error);
+    throw new Error(error.message);
+  }
   return data;
 }
 
@@ -47,7 +57,10 @@ export async function updateProfile(userId: string, updates: Record<string, unkn
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error(`[DB Error] updateProfile for ${userId}:`, error);
+    throw new Error(error.message);
+  }
   return data;
 }
 
@@ -59,7 +72,10 @@ export async function updateSettings(userId: string, updates: Record<string, unk
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error(`[DB Error] updateSettings for ${userId}:`, error);
+    throw new Error(error.message);
+  }
   return data;
 }
 
@@ -77,7 +93,10 @@ export async function completeOnboarding(userId: string, bankName: string, maske
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error(`[DB Error] completeOnboarding for ${userId}:`, error);
+    throw new Error(error.message);
+  }
 
   // Ensure settings + wallet exist
   await supabase

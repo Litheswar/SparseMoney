@@ -66,10 +66,17 @@ function AppRoutes() {
   if (user?.role === 'user' && !user.bankConnected) {
     return (
       <Routes>
-        <Route path="*" element={<OnboardingPage />} />
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/user-entry" element={<UserEntryPage />} />
+        <Route path="/onboarding" element={<OnboardingPage />} />
+        {/* Redirect any dashboard access to onboarding */}
+        <Route path="/dashboard/*" element={<Navigate to="/onboarding" replace />} />
+        {/* Fallback to onboarding for other unknown paths while in this state */}
+        <Route path="*" element={<Navigate to="/onboarding" replace />} />
       </Routes>
     );
   }
+
 
   // Admin routes
   if (user?.role === 'admin') {

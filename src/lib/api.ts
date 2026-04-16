@@ -28,7 +28,25 @@ async function apiFetch<T = any>(path: string, options: RequestInit = {}): Promi
     },
   });
 
-  const json = await res.json();
+  const contentType = res.headers.get('content-type');
+  let json: any;
+
+  try {
+    if (contentType && contentType.includes('application/json')) {
+      json = await res.json();
+    } else if (res.status === 204) {
+      return {} as T;
+    } else {
+      const text = await res.text();
+      console.error(`[API] Non-JSON response from ${path} (${res.status}):`, text);
+      throw new Error(`Server error: Received non-JSON response (${res.status}). The backend might be down or misconfigured.`);
+    }
+  } catch (err: any) {
+    if (err instanceof SyntaxError) {
+      throw new Error('Server returned invalid JSON. This usually means the backend crashed or returned an error page.');
+    }
+    throw err;
+  }
 
   if (!res.ok || !json.success) {
     throw new Error(json.error || json.message || `API error ${res.status}`);

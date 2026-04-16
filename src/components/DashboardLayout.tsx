@@ -10,6 +10,7 @@ import { useApp } from '@/context/AppContext';
 import NotificationPanel from './NotificationPanel';
 import { PremiumSidebar } from './PremiumSidebar';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import BrandLogo from './BrandLogo';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
@@ -48,13 +49,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </Sheet>
           </div>
 
-          <div className="flex flex-col">
-            <h2 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] opacity-50">
-              {user?.role === 'admin' ? 'Admin Gateway' : 'Overview'}
-            </h2>
-            <p className="text-base font-bold text-foreground tracking-tight">
-              {location.pathname.split('/').pop()?.replace(/^\w/, (c) => c.toUpperCase()) || 'Dashboard'}
-            </p>
+          <div className="flex items-center gap-4">
+            <BrandLogo size={24} hideText className="hidden lg:block" context="sage" />
+            <div className="flex flex-col">
+              <h2 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] opacity-50">
+                {user?.role === 'admin' ? 'Admin Gateway' : 'Overview'}
+              </h2>
+              <p className="text-base font-bold text-foreground tracking-tight">
+                {location.pathname.split('/').pop()?.replace(/^\w/, (c) => c.toUpperCase()) || 'Dashboard'}
+              </p>
+            </div>
           </div>
 
           <div className="ml-auto flex items-center gap-6">

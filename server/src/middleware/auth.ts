@@ -37,9 +37,9 @@ async function ensureUserExists(userId: string, email?: string, name?: string) {
     await supabase
       .from('user_settings')
       .upsert({ user_id: userId }, { onConflict: 'user_id', ignoreDuplicates: true });
-  } catch (err) {
+  } catch (err: any) {
     // Non-fatal — log but don't block the request
-    logger.warn(`[Auth] ensureUserExists failed for ${userId}: ${(err as any)?.message}`);
+    logger.error(`[Auth] ensureUserExists failed for ${userId}. This is often due to RLS or incorrect Service Role Key. Error: ${err?.message}`, { error: err });
   }
 }
 
@@ -55,8 +55,9 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
     const { data, error } = await supabaseAnon.auth.getUser(token);
 
     if (error || !data.user) {
-      logger.warn(`Auth failed: ${error?.message || 'No user found'}`);
-      res.status(401).json({ success: false, error: 'Invalid or expired token' });
+      const errMsg = error?.message || 'No user found in verification response';
+      logger.warn(`Auth failed: ${errMsg}. Token: ${token.substring(0, 10)}...`);
+      res.status(401).json({ success: false, error: errMsg });
       return;
     }
 
