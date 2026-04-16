@@ -331,25 +331,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const createGroup = async (groupData: any) => {
     try {
-      await api.groups.create({ 
+      const result = await api.groups.create({ 
         name: groupData.name, 
         goal: groupData.goalAmount, 
         emoji: groupData.emoji 
       });
       await refreshGroups();
       toast.success('Group Goal Created! 🚀');
+      return result;
     } catch (err) {
       toast.error('Failed to create group');
+      throw err;
     }
   };
 
   const contributeToGroup = async (groupId: string, amount: number) => {
     try {
-      await api.groups.contribute(groupId, amount);
+      const result = await api.groups.contribute(groupId, amount);
       await refreshGroups();
       toast.success(`Invested ₹${amount} into the Goal!`);
+      return result;
     } catch (err) {
       toast.error('Contribution failed');
+      throw err;
     }
   };
 

@@ -193,3 +193,34 @@
   content: '';
   @apply absolute top-0 right-0 w-32 h-32 bg-[#D4A017]/5 rounded-full blur-3xl -z-0;
 }
+
+.glass-card-dark {
+  @apply bg-[#0F172A] border border-slate-800 shadow-2xl;
+}
+
+.hover-lift {
+  @apply transition-all duration-300;
+}
+
+.hover-lift:hover {
+  @apply -translate-y-1.5 shadow-[0_20px_40px_rgba(0,0,0,0.08)];
+}
+
+.success-breathing {
+  @apply relative;
+}
+
+.success-breathing::after {
+  content: '';
+  @apply absolute -inset-1 rounded-full bg-success/20 animate-pulse;
+}
+
+@keyframes progress-ripple {
+   0% { transform: scale(0.9); opacity: 0.8; }
+   50% { transform: scale(1.1); opacity: 0.4; }
+   100% { transform: scale(1.2); opacity: 0; }
+}
+
+.animate-progress-ripple {
+   animation: progress-ripple 3s ease-out infinite;
+}

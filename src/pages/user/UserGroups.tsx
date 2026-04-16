@@ -297,6 +297,7 @@ export default function UserGroups() {
   const navigate = useNavigate();
   const { groups, createGroup } = useApp();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     name: '',
@@ -312,22 +313,29 @@ export default function UserGroups() {
   const nextStep = () => setStep(prev => prev + 1);
   const prevStep = () => setStep(prev => prev - 1);
 
-  const handleCreate = () => {
-    createGroup({
-      name: formData.name,
-      goalAmount: Number(formData.goalAmount),
-      category: formData.category,
-      emoji: CATEGORIES.find(c => c.id === formData.category)?.icon || '💰',
-      targetDate: formData.targetDate || new Date(Date.now() + 30 * 86400000).toISOString(),
-      contributionMode: formData.contributionMode,
-      smartOptions: {
-        autoRoundUp: formData.autoRoundUp,
-        weeklyFixed: formData.weeklyFixed,
-        penaltyNudge: formData.penaltyNudge
-      },
-      createdBy: 'u1'
-    });
-    nextStep();
+  const handleCreate = async () => {
+    try {
+      setIsCreating(true);
+      await createGroup({
+        name: formData.name,
+        goalAmount: Number(formData.goalAmount),
+        category: formData.category,
+        emoji: CATEGORIES.find(c => c.id === formData.category)?.icon || '💰',
+        targetDate: formData.targetDate || new Date(Date.now() + 30 * 86400000).toISOString(),
+        contributionMode: formData.contributionMode,
+        smartOptions: {
+          autoRoundUp: formData.autoRoundUp,
+          weeklyFixed: formData.weeklyFixed,
+          penaltyNudge: formData.penaltyNudge
+        },
+        createdBy: 'u1'
+      });
+      nextStep();
+    } catch (err) {
+      console.error('Group creation failed:', err);
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   const resetAndClose = () => {
@@ -390,6 +398,14 @@ export default function UserGroups() {
       {/* --- CREATE GROUP MODAL --- */}
       <Dialog open={isModalOpen} onOpenChange={(val) => !val && resetAndClose()}>
         <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden rounded-[2rem] border-none shadow-2xl glass">
+          <DialogHeader className="sr-only">
+            <DialogTitle>
+              {step === 1 ? 'Group Details' : step === 2 ? 'Contribution Rules' : step === 3 ? 'Invite Members' : 'Goal Initialized!'}
+            </DialogTitle>
+            <DialogDescription>
+              {step === 1 ? 'Set up your group savings goal.' : step === 2 ? 'Define how members will contribute.' : step === 3 ? 'Invite your squad to join.' : 'Your group has been created successfully.'}
+            </DialogDescription>
+          </DialogHeader>
           <div className="p-8">
             <AnimatePresence mode="wait">
               {step === 1 && (
@@ -401,7 +417,7 @@ export default function UserGroups() {
                   className="space-y-6"
                 >
                   <div className="space-y-2">
-                    <h2 className="text-2xl font-bold font-heading text-foreground">Group Details</h2>
+                    <p className="text-2xl font-bold font-heading text-foreground">Group Details</p>
                     <p className="text-sm text-muted-foreground">What are you saving for?</p>
                   </div>
 
@@ -479,7 +495,7 @@ export default function UserGroups() {
                   className="space-y-6"
                 >
                   <div className="space-y-2">
-                    <h2 className="text-2xl font-bold font-heading text-foreground">Contribution Rules</h2>
+                    <p className="text-2xl font-bold font-heading text-foreground">Contribution Rules</p>
                     <p className="text-sm text-muted-foreground">Define how members contribute</p>
                   </div>
 
@@ -572,7 +588,7 @@ export default function UserGroups() {
                   className="space-y-6"
                 >
                   <div className="space-y-2">
-                    <h2 className="text-2xl font-bold font-heading text-foreground">Invite Members</h2>
+                    <p className="text-2xl font-bold font-heading text-foreground">Invite Members</p>
                     <p className="text-sm text-muted-foreground">Share the link with your squad</p>
                   </div>
 
@@ -623,8 +639,16 @@ export default function UserGroups() {
                     <Button 
                       className="flex-[2] rounded-xl gradient-primary text-primary-foreground h-12 shadow-lg shadow-primary/20"
                       onClick={handleCreate}
+                      disabled={isCreating}
                     >
-                      Finish & Create
+                      {isCreating ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          Creating...
+                        </div>
+                      ) : (
+                        'Finish & Create'
+                      )}
                     </Button>
                   </div>
                 </motion.div>
@@ -657,7 +681,7 @@ export default function UserGroups() {
                   </div>
 
                   <div className="space-y-2">
-                    <h2 className="text-2xl font-bold font-heading text-foreground">Goal Initialized!</h2>
+                    <p className="text-2xl font-bold font-heading text-foreground">Goal Initialized!</p>
                     <p className="text-sm text-muted-foreground">The "{formData.name}" group is now live.</p>
                   </div>
 
