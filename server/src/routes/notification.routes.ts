@@ -24,7 +24,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
  */
 router.patch('/:id/read', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
-    await markAsRead(req.params.id, req.userId!);
+    await markAsRead(req.params.id as string, req.userId!);
     res.json({ success: true });
   } catch (err: any) {
     logger.error('Mark read error:', err);

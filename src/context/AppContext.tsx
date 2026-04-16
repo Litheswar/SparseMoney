@@ -60,7 +60,11 @@ interface AppContextType {
   destinationBalances: Record<RuleDestination, number>;
   
   groups: any[];
+  groupContributions: any[];
   refreshGroups: () => Promise<void>;
+  createGroup: (groupData: any) => Promise<void>;
+  addContributionToGroup: (groupId: string, amount: number, source: 'roundup' | 'manual') => Promise<void>;
+  contributeToGroup: (groupId: string, amount: number) => Promise<void>;
   automationImpact: number;
   marketPrices: Record<string, { price: number; changePercent: number; updatedAt: string }>;
 }
@@ -77,6 +81,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [lastInvestment, setLastInvestment] = useState<{ amount: number; timestamp: Date } | null>(null);
   const [loading, setLoading] = useState(true);
   const [groups, setGroups] = useState<any[]>([]);
+  const [groupContributions, setGroupContributions] = useState<any[]>([]);
   const [rules, setRules] = useState<Rule[]>([]);
   const [automationImpact, setAutomationImpact] = useState(0);
   
@@ -239,7 +244,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const refreshGroups = useCallback(async () => {
     try {
       const data = await api.groups.list();
-      setGroups(data || []);
+      // data from getGroups already maps 'members' and 'recentActivity'
+      // but we need to ensure fields exist for UserGroups card
+      const mappedGroups = (data || []).map((g: any) => ({
+        ...g,
+        urgencyStatus: g.urgencyStatus || 'On track',
+        energyScore: g.energyScore || 85,
+        trendData: g.trendData || [50, 100, 150, 200, 250, 300, 350],
+        lastActivity: g.recentActivity?.[0] ? {
+           userName: g.recentActivity[0].userName,
+           amount: g.recentActivity[0].amount,
+           timestamp: g.recentActivity[0].timestamp
+        } : null,
+        members: (g.members || []).map((m: any) => ({
+            ...m,
+            contributionShare: Math.round(((m.totalContributed || 0) / (g.totalSaved || 1)) * 100),
+            badges: m.badges || []
+        }))
+      }));
+      setGroups(mappedGroups);
+
+      // Extract all contributions into flat array for GroupDetails.tsx backwards compat
+      let allContributions: any[] = [];
+      mappedGroups.forEach((g: any) => {
+        if (g.recentActivity) {
+          allContributions = [...allContributions, ...g.recentActivity.map((r: any) => ({
+             ...r,
+             groupId: g.id 
+          }))];
+        }
+      });
+      setGroupContributions(allContributions.sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
     } catch (err) {
       console.error('Groups refresh error:', err);
     }
@@ -294,6 +329,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const createGroup = async (groupData: any) => {
+    try {
+      await api.groups.create({ 
+        name: groupData.name, 
+        goal: groupData.goalAmount, 
+        emoji: groupData.emoji 
+      });
+      await refreshGroups();
+      toast.success('Group Goal Created! 🚀');
+    } catch (err) {
+      toast.error('Failed to create group');
+    }
+  };
+
+  const contributeToGroup = async (groupId: string, amount: number) => {
+    try {
+      await api.groups.contribute(groupId, amount);
+      await refreshGroups();
+      toast.success(`Invested ₹${amount} into the Goal!`);
+    } catch (err) {
+      toast.error('Contribution failed');
+    }
+  };
+
+  const addContributionToGroup = async (groupId: string, amount: number, source: 'roundup' | 'manual') => {
+      await contributeToGroup(groupId, amount);
+  };
+
   const simulateTransaction = useCallback(async () => {
     try {
       const result = await api.transactions.simulate();
@@ -345,7 +408,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       weeklySpare, growthPercent, isStreaming, setIsStreaming,
       simulateTransaction, lastInvestment, loading, refreshDashboard,
       updateThreshold: (v) => setWallet(p => ({ ...p, threshold: v })),
-      groups, refreshGroups, automationImpact,
+      groups, groupContributions, refreshGroups, createGroup, contributeToGroup, addContributionToGroup, automationImpact,
       portfolio, automationStats, recentExecutions, suggestedRules: [],
       destinationBalances, marketPrices,
       toggleRule, addRule, updateRule: async () => {}, deleteRule: async () => {}, duplicateRule: async () => {}

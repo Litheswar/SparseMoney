@@ -83,7 +83,7 @@ export const api = {
   // === RULES ===
   rules: {
     list: () => apiFetch('/rules'),
-    create: (rule: { name: string; condition: string; action: string; category?: string; enabled?: boolean }) =>
+    create: (rule: { name: string; condition: string; action: string; target: string; category?: string; enabled?: boolean }) =>
       apiFetch('/rules', { method: 'POST', body: JSON.stringify(rule) }),
     toggle: (id: string) => apiFetch(`/rules/${id}/toggle`, { method: 'PATCH' }),
     delete: (id: string) => apiFetch(`/rules/${id}`, { method: 'DELETE' }),
